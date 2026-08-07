@@ -16,6 +16,9 @@ Nothing bulky is loaded by default. Each layer is opened only when it's needed:
 | `docs/registry.md` | on request | Curated external skills/libraries and when to use each |
 | `prompts/*.md` | pasted by you | One prompt per build slice |
 
+`docs/document-register.md` records every document in the repo, its purpose and its
+known gaps. Update it whenever a document is added or removed.
+
 Adding a large "read everything" file would defeat this. If a rule is needed on
 every task, it belongs in `CLAUDE.md`. If it's needed sometimes, it belongs in a
 skill. If it's needed rarely, it belongs behind a row in `docs/registry.md`.

@@ -11,6 +11,7 @@ Nothing bulky is loaded by default. Each layer is opened only when it's needed:
 |---|---|---|
 | `CLAUDE.md` | every session, automatically | Constraints, stack, domain vocabulary, routing table |
 | `.claude/skills/supporthub-ui/SKILL.md` | automatically, on front-end work | UI, accessibility and form rules |
+| `docs/api-contract.md` | on request | Types, endpoints, status transitions — authoritative |
 | `docs/proposal-brief.md` | on request | The 10% of the research proposal that changes build decisions |
 | `docs/registry.md` | on request | Curated external skills/libraries and when to use each |
 | `prompts/*.md` | pasted by you | One prompt per build slice |
@@ -21,8 +22,16 @@ skill. If it's needed rarely, it belongs behind a row in `docs/registry.md`.
 
 ## Building
 
-Slice 1 is the front-end foundation. Paste `prompts/frontend-foundation.md` into
-Claude Code from the repo root.
+One slice at a time, in order. Paste the prompt into Claude Code from the repo root
+and review at each pause it offers.
+
+| Slice | Prompt | Scope |
+|---|---|---|
+| 1 | `prompts/frontend-foundation.md` | Design system + student ticket lifecycle (the six usability-test tasks) |
+| 2 | `prompts/technician-dashboard.md` | Queue, triage, assignment, status transitions, internal notes, escalation |
+| 3 | `prompts/manager-analytics.md` | Demand, responsiveness, recurring problems, satisfaction, CSV export |
+
+Merge each slice before starting the next — slices 2 and 3 reuse slice 1's primitives.
 
 ## Group 12
 

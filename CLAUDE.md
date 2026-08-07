@@ -47,9 +47,13 @@ Do **not** load these unless the current task needs them.
 
 | Need | Open |
 |---|---|
+| Types, endpoints, status transition rules, seed data | `docs/api-contract.md` |
 | Research objectives, evaluation measures, scope justification | `docs/proposal-brief.md` |
 | External skills/plugins/libraries — what exists and when to use it | `docs/registry.md` |
 | Build prompts for each slice | `prompts/` |
+
+`docs/api-contract.md` is authoritative for anything data-shaped. Never redefine a
+type inline in a prompt or a component when the contract already declares it.
 
 UI conventions live in `.claude/skills/supporthub-ui/SKILL.md` and load
 automatically when you touch front-end code. Don't duplicate them here.

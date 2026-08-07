@@ -15,7 +15,8 @@ Read, in this order, and then **stop reading**:
 
 1. `CLAUDE.md` — constraints and domain vocabulary
 2. `.claude/skills/supporthub-ui/SKILL.md` — UI rules
-3. `docs/proposal-brief.md` — the six usability tasks are your acceptance criteria
+3. `docs/api-contract.md` — types, endpoints, status transitions
+4. `docs/proposal-brief.md` — the six usability tasks are your acceptance criteria
 
 Do **not** open `docs/registry.md`, the source `.docx`, or any external repository
 unless you hit a specific problem a registry row names. If you do open one, say
@@ -30,58 +31,27 @@ React 18 · Vite · TypeScript strict · Tailwind · React Router · MSW for moc
 installable PWA. No other runtime dependencies without asking me first and naming
 which step of the ladder in `CLAUDE.md` failed.
 
-## Domain model — implement exactly this, invent nothing
+## Domain model
 
-```ts
-type Role = 'student' | 'lecturer' | 'staff' | 'technician' | 'manager';
-type Status = 'submitted' | 'assigned' | 'in_progress' | 'resolved' | 'closed';
-type Priority = 'low' | 'medium' | 'high' | 'critical';
-type Category = 'wifi' | 'lms' | 'account' | 'printing' | 'lab_computer'
-              | 'software' | 'email' | 'projector' | 'other';
+Implement `docs/api-contract.md` exactly — types, endpoints, status transition map,
+seed data. Invent nothing; if something you need is missing from it, stop and ask,
+then we change the contract in its own commit.
 
-interface User { id: string; name: string; email: string; role: Role; }
-
-interface Ticket {
-  id: string;              // human-readable, e.g. "EDU-1042"
-  title: string;
-  description: string;
-  category: Category;
-  priority: Priority;
-  status: Status;
-  location: string;        // campus, building, room
-  deviceInfo?: string;
-  attachments: Attachment[];
-  reportedBy: User;
-  assignedTo?: User;
-  createdAt: string;       // ISO
-  updatedAt: string;
-  resolvedAt?: string;
-  comments: Comment[];
-  feedback?: Feedback;
-}
-
-interface Attachment { id: string; filename: string; url: string; sizeBytes: number; }
-interface Comment { id: string; author: User; body: string; createdAt: string; isStaffReply: boolean; }
-interface Feedback { rating: 1|2|3|4|5; comment?: string; submittedAt: string; }
-```
-
-Mocked endpoints (MSW handlers, realistic latency, and a deliberate failure case
-so error states are real):
+This slice needs only these endpoints. Mock the rest as 501 so later slices fail loudly
+rather than silently:
 
 ```
 POST   /api/auth/login
-GET    /api/tickets                 // current user's tickets
+GET    /api/tickets?scope=mine
 POST   /api/tickets
 GET    /api/tickets/:id
 POST   /api/tickets/:id/comments
 POST   /api/tickets/:id/feedback
 POST   /api/attachments
-GET    /api/knowledge-base?q=
 ```
 
-Seed ~12 tickets spread across every status and category, with realistic campus
-wording ("Wi-Fi drops in Library level 2", "Moodle won't accept my submission").
-Bland seed data makes usability tests unrealistic.
+Give the MSW handlers realistic latency and one deliberate failure case, so the
+error states you build are real rather than theoretical.
 
 ## Build exactly this
 

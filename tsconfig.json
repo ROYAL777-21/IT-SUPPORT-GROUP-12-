@@ -1,0 +1,23 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+
+      // @firebase/auth ships a React Native build (dist/rn) that exports
+      // getReactNativePersistence, and Metro loads it via the package's
+      // "react-native" export condition. TypeScript cannot get there on its
+      // own: the exports map lists the generic "types" key *before*
+      // "react-native", and conditional exports match in declaration order, so
+      // "types" always wins and tsc sees the browser surface instead.
+      //
+      // Pointing tsc straight at the RN declarations makes the types match the
+      // build that actually runs on device. Runtime resolution is untouched.
+      "@firebase/auth": ["node_modules/@firebase/auth/dist/rn/index.rn.d.ts"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules"]
+}

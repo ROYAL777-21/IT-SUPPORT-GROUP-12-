@@ -1,0 +1,68 @@
+rules_version = '2';
+
+// Deploy with:  firebase deploy --only firestore:rules
+//
+// The client also checks some of these conditions for a better error message,
+// but these rules are the only enforcement that actually counts — anything
+// client-side can be bypassed.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isInstitutionalEmail() {
+      return isSignedIn()
+        && request.auth.token.email.matches('.*@(eduvos[.]com|eduvos[.]ac[.]za)$');
+    }
+
+    // Support agents are marked with a custom claim set from a trusted
+    // environment (Admin SDK / Cloud Function) — never from the app.
+    function isSupportAgent() {
+      return isSignedIn() && request.auth.token.support == true;
+    }
+
+    match /tickets/{ticketId} {
+      function isOwner() {
+        return isSignedIn() && resource.data.createdBy == request.auth.uid;
+      }
+
+      allow read: if isOwner() || isSupportAgent();
+
+      // A student may only create a ticket under their own uid, and only in
+      // the 'open' state — they cannot log something pre-resolved.
+      allow create: if isInstitutionalEmail()
+                    && request.resource.data.createdBy == request.auth.uid
+                    && request.resource.data.status == 'open';
+
+      // Students may edit their own ticket but may not reassign it or hand
+      // themselves a different uid. Support agents may change anything.
+      allow update: if isSupportAgent()
+                    || (isOwner()
+                        && request.resource.data.createdBy == resource.data.createdBy
+                        && request.resource.data.assignedTo == resource.data.assignedTo);
+
+      allow delete: if isOwner() || isSupportAgent();
+
+      match /comments/{commentId} {
+        function parentTicket() {
+          return get(/databases/$(database)/documents/tickets/$(ticketId)).data;
+        }
+
+        allow read: if isSupportAgent()
+                    || (isSignedIn() && parentTicket().createdBy == request.auth.uid);
+
+        allow create: if isSignedIn()
+                      && request.resource.data.authorId == request.auth.uid
+                      && (isSupportAgent() || parentTicket().createdBy == request.auth.uid)
+                      // Only support may post a comment marked as from support.
+                      && (request.resource.data.fromSupport == false || isSupportAgent());
+
+        // Comments are an audit trail — no edits, no deletions.
+        allow update, delete: if false;
+      }
+    }
+  }
+}

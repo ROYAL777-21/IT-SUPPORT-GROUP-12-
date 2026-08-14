@@ -21,6 +21,7 @@ blocked on the design files (see below).
 | Firestore two-way sync | Done |
 | Firebase Auth (email/password, domain-restricted) | Done |
 | Firestore security rules | Done |
+| EAS build + submit config | Done — needs `eas init` and env vars uploaded |
 | App screens | **Blocked on design files** |
 
 `App.tsx` is a placeholder health-check screen, not the real UI. It exists so
@@ -71,6 +72,89 @@ up the Firebase project.
 4. Create a **Firestore** database.
 5. Deploy the rules: `firebase deploy --only firestore:rules`.
 
+## Deployment (EAS)
+
+Builds and store submissions go through **EAS** — Expo's cloud build service.
+Profiles are defined in `eas.json`.
+
+### One-time setup
+
+```bash
+npm install -g eas-cli     # not a project dependency; eas.json pins the version
+eas login
+eas init                   # creates the EAS project, writes extra.eas.projectId to app.json
+```
+
+`eas init` is what adds `owner` and `extra.eas.projectId` to `app.json`. Those
+are intentionally absent right now — they identify a specific EAS account, so
+they get generated rather than committed ahead of time.
+
+### Environment variables — do this before the first build
+
+**This is the step that silently breaks builds if skipped.** `.env` is
+gitignored, so EAS build servers never see it. Without these, the app builds
+fine but ships with Firebase unconfigured and runs SQLite-only, syncing nothing.
+
+Upload each value once per environment:
+
+```bash
+eas env:set --name EXPO_PUBLIC_FIREBASE_API_KEY             --value "..." --environment production --visibility plaintext
+eas env:set --name EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN         --value "..." --environment production --visibility plaintext
+eas env:set --name EXPO_PUBLIC_FIREBASE_PROJECT_ID          --value "..." --environment production --visibility plaintext
+eas env:set --name EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET      --value "..." --environment production --visibility plaintext
+eas env:set --name EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID --value "..." --environment production --visibility plaintext
+eas env:set --name EXPO_PUBLIC_FIREBASE_APP_ID              --value "..." --environment production --visibility plaintext
+```
+
+Repeat with `--environment preview` (and `development`) — or set them in the
+project's Environment variables page on expo.dev, which is less typing.
+
+`plaintext` is correct here: anything with an `EXPO_PUBLIC_` prefix is compiled
+into the app bundle and readable by anyone who installs it. Marking them
+`secret` would not hide them and would stop the build from reading them.
+Firebase security rules are what protect the data.
+
+To pull them back down for local work: `eas env:pull --environment development`.
+
+### Build profiles
+
+| Profile | Output | Use |
+| --- | --- | --- |
+| `development` | Dev client, Android APK | Day-to-day development with native debugging |
+| `development-simulator` | iOS simulator build | iOS testing without an Apple Developer account |
+| `preview` | Android APK, internal distribution | Hand to groupmates or the lecturer — installs directly, no store |
+| `production` | Android AAB | Play Store / App Store submission |
+
+```bash
+eas build --profile preview    --platform android
+eas build --profile production --platform all
+```
+
+`preview` is the one to reach for when demoing. It produces an APK anyone can
+sideload from a link — no store review, no device registration.
+
+**iOS note:** anything installed on a physical iPhone (`development`, `preview`,
+`production`) requires a paid Apple Developer account, because Apple requires
+provisioning for device installs. `development-simulator` avoids that but only
+runs in the macOS simulator. Android has no equivalent cost.
+
+### Versioning
+
+`cli.appVersionSource` is `remote`, so EAS owns the build number and
+`production` has `autoIncrement` on — build numbers advance by themselves. Bump
+the user-facing `version` in `app.json` by hand for releases.
+
+### Store submission
+
+```bash
+eas submit --profile production --platform android
+```
+
+`submit.production` in `eas.json` is intentionally empty — it needs a Google
+Play service-account key and an App Store Connect app ID, which are account
+credentials rather than repository content. EAS prompts for them on first run
+and stores them against the project.
+
 Firestore needs one composite index for the sync query
 (`createdBy` ascending, `updatedAt` ascending). The first sync will fail with a
 console link that creates it in one click.
@@ -79,6 +163,8 @@ console link that creates it in one click.
 
 ```
 App.tsx                       Placeholder health check — replaced by the real UI
+app.json                      Expo app config — name, bundle ids, plugins
+eas.json                      EAS build profiles and store submission config
 firestore.rules               Server-side authorisation (the enforcement that counts)
 src/
   config/firebase.ts          Firebase init, RN auth persistence, configured-or-not flag

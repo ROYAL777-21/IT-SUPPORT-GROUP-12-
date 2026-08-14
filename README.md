@@ -50,14 +50,19 @@ cp .env.example .env      # then fill in from the Firebase console
 npm start
 ```
 
-Press `i` for iOS, `a` for Android, or scan the QR code with Expo Go.
+Press `a` for Android, or scan the QR code with Expo Go.
 
-**iOS and Android only — there is deliberately no web target.** On web, Metro
-resolves packages under the `browser` export condition, which gives a build of
-`@firebase/auth` that does not contain `getReactNativePersistence`, so auth
-would fail to initialise. `expo-sqlite` also needs extra setup to run in a
-browser. Rather than ship a target that breaks, `expo start --web` is not wired
-up.
+**Android is the target platform.** The app code is platform-agnostic — there is
+no `Platform.OS` branching anywhere in `src/` — so iOS remains available later
+without a rewrite. Only the build and release setup is Android-specific. The
+iOS block in `app.json` is kept for that reason; it costs nothing and reserves
+the bundle identifier.
+
+**There is deliberately no web target.** On web, Metro resolves packages under
+the `browser` export condition, which gives a build of `@firebase/auth` that
+does not contain `getReactNativePersistence`, so auth would fail to initialise.
+`expo-sqlite` also needs extra setup to run in a browser. Rather than ship a
+target that breaks, `expo start --web` is not wired up.
 
 The app **runs without Firebase configured** — it falls back to SQLite-only and
 never syncs. That is deliberate: it keeps the app testable before anyone has set
@@ -120,23 +125,21 @@ To pull them back down for local work: `eas env:pull --environment development`.
 
 | Profile | Output | Use |
 | --- | --- | --- |
-| `development` | Dev client, Android APK | Day-to-day development with native debugging |
-| `development-simulator` | iOS simulator build | iOS testing without an Apple Developer account |
-| `preview` | Android APK, internal distribution | Hand to groupmates or the lecturer — installs directly, no store |
-| `production` | Android AAB | Play Store / App Store submission |
+| `development` | Dev client APK | Day-to-day development with native debugging |
+| `preview` | APK, internal distribution | Hand to groupmates or the lecturer — installs directly, no store |
+| `production` | AAB | Play Store submission |
 
 ```bash
 eas build --profile preview    --platform android
-eas build --profile production --platform all
+eas build --profile production --platform android
 ```
 
 `preview` is the one to reach for when demoing. It produces an APK anyone can
-sideload from a link — no store review, no device registration.
+sideload from a link — no store review, no device registration, no cost.
 
-**iOS note:** anything installed on a physical iPhone (`development`, `preview`,
-`production`) requires a paid Apple Developer account, because Apple requires
-provisioning for device installs. `development-simulator` avoids that but only
-runs in the macOS simulator. Android has no equivalent cost.
+Android needs no paid developer account to build or sideload. A Google Play
+Developer account (one-off fee) is only required to publish to the Play Store,
+not to distribute an APK to your group or lecturer.
 
 ### Versioning
 
@@ -151,9 +154,8 @@ eas submit --profile production --platform android
 ```
 
 `submit.production` in `eas.json` is intentionally empty — it needs a Google
-Play service-account key and an App Store Connect app ID, which are account
-credentials rather than repository content. EAS prompts for them on first run
-and stores them against the project.
+Play service-account key, which is an account credential rather than repository
+content. EAS prompts for it on first run and stores it against the project.
 
 Firestore needs one composite index for the sync query
 (`createdBy` ascending, `updatedAt` ascending). The first sync will fail with a

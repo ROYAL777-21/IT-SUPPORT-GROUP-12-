@@ -12,6 +12,12 @@ pairing that works together. This document records what we picked and why.
 | Backend | Firebase vs roll-your-own | **Firebase (Auth + Firestore)** |
 | On-device storage | SQLite vs none | **SQLite (expo-sqlite)** |
 
+> **Release scope:** the first release targets **Android only**. That does not
+> change the analysis below — if anything it sharpens it. The app code has no
+> platform branching, so iOS stays available later as a build target rather than
+> a rewrite. Had we picked Swift, Android would have been foreclosed entirely;
+> going Android-first keeps the option we would otherwise have thrown away.
+
 ---
 
 ## 1. React Native vs Swift

@@ -42,9 +42,13 @@ async function migrate(db: SQLite.SQLiteDatabase): Promise<void> {
       continue;
     }
 
-    await db.withTransactionAsync(async () => {
+    // Exclusive rather than plain: withTransactionAsync sweeps *any* query
+    // that happens to run while it is open into the transaction, including
+    // reads the UI kicks off at launch. A half-applied schema is not something
+    // to leave to timing.
+    await db.withExclusiveTransactionAsync(async (txn) => {
       for (const statement of migration.statements) {
-        await db.execAsync(statement);
+        await txn.execAsync(statement);
       }
     });
 
@@ -57,10 +61,11 @@ async function migrate(db: SQLite.SQLiteDatabase): Promise<void> {
 /** Drops the local cache. Used on sign-out so the next user starts clean. */
 export async function resetDatabase(): Promise<void> {
   const db = await getDatabase();
-  await db.withTransactionAsync(async () => {
-    await db.execAsync('DELETE FROM ticket_comments;');
-    await db.execAsync('DELETE FROM tickets;');
-    await db.execAsync('DELETE FROM sync_meta;');
+  await db.withExclusiveTransactionAsync(async (txn) => {
+    await txn.execAsync('DELETE FROM ticket_comments;');
+    await txn.execAsync('DELETE FROM tickets;');
+    await txn.execAsync('DELETE FROM user_profiles;');
+    await txn.execAsync('DELETE FROM sync_meta;');
   });
 }
 

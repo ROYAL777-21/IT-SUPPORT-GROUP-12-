@@ -27,6 +27,7 @@ The app is complete: both the student side and the IT support side.
 | Support screens — queue, assign, status, reply | Done |
 | Firestore security rules | Done, **25 rules tests passing** |
 | EAS build + submission config | Done — needs `eas init` and env vars uploaded |
+| **APK build in GitHub Actions** | Done — no Expo account needed, see [below](#getting-an-apk-onto-a-phone) |
 
 **Before it runs you need a Firebase project and an Azure app registration.**
 Both are free. See [Setup](#setup).
@@ -138,6 +139,57 @@ in CI. It covers the things that would actually hurt: a student reading another
 student's ticket, assigning work to themselves, posting a comment that claims
 to be from IT support, or promoting themselves to support by editing their own
 profile.
+
+## Getting an APK onto a phone
+
+There are two routes. **The GitHub Actions one needs no Expo account, no
+credit card and no local Android setup**, so start there.
+
+### Route 1 — GitHub Actions (no accounts needed)
+
+`.github/workflows/android-apk.yml` builds an installable APK on every push.
+GitHub's runners already have the Android SDK, and `expo prebuild` generates a
+project whose release build is signed with a stable debug key — stable being
+the part that matters, because it means each new APK installs *over* the last
+one rather than being treated as a different app.
+
+**To download one:**
+
+1. Repository → **Actions** → **Build Android APK** → pick the latest run.
+2. Scroll to **Artifacts** and download the `.apk`.
+3. On the phone, open the file and allow installing from that source.
+
+Artifact downloads require a GitHub login. To get a **public link** — for a
+lecturer, say — push a tag instead, and the APK is attached to a GitHub
+Release that anyone can download:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+**Before the APK is actually usable, add your Firebase config as a secret.**
+Without it the build still succeeds, but the APK is marked `-PLACEHOLDER-no-firebase`
+and cannot sign in or sync — it falls back to SQLite-only.
+
+```bash
+base64 -w0 google-services.json   # macOS: base64 -i google-services.json
+```
+
+Repository → Settings → Secrets and variables → Actions → New repository secret:
+
+| Secret | Value |
+| --- | --- |
+| `GOOGLE_SERVICES_JSON_BASE64` | the base64 string from above |
+| `EXPO_PUBLIC_AZURE_TENANT_ID` | your Entra Directory (tenant) ID |
+
+The debug signing key is fine for handing the APK around directly. It is *not*
+the key to publish to the Play Store with — for that, use the EAS `production`
+profile below.
+
+### Route 2 — EAS Build
+
+Needs a free Expo account. Better for Play Store releases and for iOS.
 
 ## Deployment (EAS)
 

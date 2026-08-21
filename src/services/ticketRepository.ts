@@ -1,6 +1,7 @@
 import { getDatabase } from '@/db/database';
 import {
   NewTicketInput,
+  TICKET_STATUSES,
   Ticket,
   TicketComment,
   TicketStatus,
@@ -26,6 +27,7 @@ interface TicketRow {
   description: string;
   location: string | null;
   assigned_to: string | null;
+  assigned_to_name: string | null;
   created_by: string;
   created_at: number;
   updated_at: number;
@@ -54,6 +56,7 @@ function toTicket(row: TicketRow): Ticket {
     description: row.description,
     location: row.location ?? undefined,
     assignedTo: row.assigned_to ?? undefined,
+    assignedToName: row.assigned_to_name ?? undefined,
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -203,6 +206,16 @@ export async function addComment(
     ],
   );
 
+  // Touch the parent ticket. This is load-bearing, not bookkeeping: the pull
+  // only fetches comment threads for tickets whose updatedAt moved, so without
+  // this a reply would upload and then never reach the other person's device.
+  await db.runAsync(
+    `UPDATE tickets
+        SET updated_at = ?, sync_state = 'pending'
+      WHERE id = ?;`,
+    [comment.createdAt, comment.ticketId],
+  );
+
   return comment;
 }
 
@@ -215,4 +228,129 @@ export async function countPending(): Promise<number> {
        (SELECT COUNT(*) FROM ticket_comments WHERE sync_state = 'pending') AS total;`,
   );
   return row?.total ?? 0;
+}
+
+// --- Support agent queries --------------------------------------------------
+//
+// Support agents work a shared queue rather than their own tickets, so these
+// deliberately do not filter on created_by. What actually stops a student from
+// reading them is firestore.rules plus the pull scope in syncService — a
+// student's device never receives another student's rows in the first place.
+
+export interface QueueFilter {
+  /** Empty means every status. */
+  statuses?: readonly TicketStatus[];
+  /** Only tickets assigned to this uid. */
+  assignedTo?: string;
+  /** Only tickets nobody has picked up. */
+  unassignedOnly?: boolean;
+}
+
+export async function listQueue(filter: QueueFilter = {}): Promise<Ticket[]> {
+  const db = await getDatabase();
+
+  const clauses = ['deleted = 0'];
+  const params: (string | number)[] = [];
+
+  if (filter.statuses?.length) {
+    clauses.push(`status IN (${filter.statuses.map(() => '?').join(', ')})`);
+    params.push(...filter.statuses);
+  }
+  if (filter.assignedTo) {
+    clauses.push('assigned_to = ?');
+    params.push(filter.assignedTo);
+  }
+  if (filter.unassignedOnly) {
+    clauses.push('assigned_to IS NULL');
+  }
+
+  const rows = await db.getAllAsync<TicketRow>(
+    `SELECT * FROM tickets
+      WHERE ${clauses.join(' AND ')}
+      ORDER BY
+        /* Urgent first, then oldest-waiting first: a queue, not a feed. */
+        CASE priority
+          WHEN 'urgent' THEN 0
+          WHEN 'high'   THEN 1
+          WHEN 'medium' THEN 2
+          ELSE 3
+        END,
+        created_at ASC;`,
+    params,
+  );
+
+  return rows.map(toTicket);
+}
+
+/** Picks a ticket up, or hands it back when `agent` is null. */
+export async function assignTicket(
+  id: string,
+  agent: { id: string; name: string } | null,
+): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(
+    `UPDATE tickets
+        SET assigned_to = ?, assigned_to_name = ?,
+            /* Picking a ticket up is the moment work starts on it. */
+            status = CASE WHEN ? IS NOT NULL AND status = 'open' THEN 'in_progress' ELSE status END,
+            updated_at = ?, sync_state = 'pending'
+      WHERE id = ?;`,
+    [agent?.id ?? null, agent?.name ?? null, agent?.id ?? null, Date.now(), id],
+  );
+}
+
+/** Counts per status, for the queue's filter chips. */
+export async function countByStatus(
+  filter: Pick<QueueFilter, 'assignedTo'> = {},
+): Promise<Record<TicketStatus, number>> {
+  const db = await getDatabase();
+
+  const rows = await db.getAllAsync<{ status: string; total: number }>(
+    `SELECT status, COUNT(*) AS total
+       FROM tickets
+      WHERE deleted = 0 ${filter.assignedTo ? 'AND assigned_to = ?' : ''}
+      GROUP BY status;`,
+    filter.assignedTo ? [filter.assignedTo] : [],
+  );
+
+  const counts = Object.fromEntries(
+    TICKET_STATUSES.map((status) => [status, 0]),
+  ) as Record<TicketStatus, number>;
+
+  for (const row of rows) {
+    if (row.status in counts) {
+      counts[row.status as TicketStatus] = row.total;
+    }
+  }
+  return counts;
+}
+
+/**
+ * Upserts a comment pulled from Firestore.
+ *
+ * Separate from addComment() because a pulled row is already published:
+ * inserting it as 'pending' would push it straight back up, and the ON
+ * CONFLICT guard makes a re-pull of the same comment a no-op rather than a
+ * duplicate in the thread.
+ */
+export async function upsertPulledComment(comment: TicketComment): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(
+    `INSERT INTO ticket_comments (
+       id, ticket_id, author_id, author_name, from_support, body, created_at, sync_state
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, 'synced')
+     ON CONFLICT (id) DO UPDATE SET
+       body       = excluded.body,
+       sync_state = 'synced'
+     WHERE ticket_comments.sync_state = 'synced';`,
+    [
+      comment.id,
+      comment.ticketId,
+      comment.authorId,
+      comment.authorName,
+      comment.fromSupport ? 1 : 0,
+      comment.body,
+      comment.createdAt,
+    ],
+  );
 }

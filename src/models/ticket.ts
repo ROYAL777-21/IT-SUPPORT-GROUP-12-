@@ -1,10 +1,10 @@
 /**
  * Domain model for the Campus IT Help ticketing app.
  *
- * NOTE: the category / campus lists below are a first pass drawn from the
- * project brief. Confirm them against `support.js` from the design mockups
- * once those files land — that file is the source of truth for the categories
- * the UI actually offers.
+ * The category list is drawn from the project brief. `support.js` from the
+ * design mockups was meant to be the source of truth for it, but those files
+ * were never added to the repo — if they arrive, reconcile against them here
+ * and nowhere else.
  */
 
 export const TICKET_CATEGORIES = [
@@ -54,6 +54,34 @@ export const STATUS_LABELS: Record<TicketStatus, string> = {
 /** A status the student can no longer add to without reopening. */
 export const CLOSED_STATUSES: readonly TicketStatus[] = ['resolved', 'closed'];
 
+export function isClosed(status: TicketStatus): boolean {
+  return CLOSED_STATUSES.includes(status);
+}
+
+/**
+ * Which statuses each role may move a ticket to.
+ *
+ * Support drives the lifecycle. A student can only do two things: confirm a
+ * fix (resolved -> closed) or say it is still broken (reopen to open). Letting
+ * them set 'in_progress' would be meaningless — they are not the ones working
+ * it.
+ */
+export function allowedTransitions(
+  from: TicketStatus,
+  role: 'student' | 'support',
+): readonly TicketStatus[] {
+  if (role === 'support') {
+    return TICKET_STATUSES.filter((status) => status !== from);
+  }
+  if (from === 'resolved') {
+    return ['closed', 'open'];
+  }
+  if (from === 'closed') {
+    return ['open'];
+  }
+  return [];
+}
+
 /**
  * Row-level sync state. Every write lands in SQLite first and is marked
  * pending; the sync service clears the flag once Firestore has accepted it.
@@ -76,6 +104,11 @@ export interface Ticket {
   location?: string;
   /** Firebase uid of the support agent handling it, once assigned. */
   assignedTo?: string;
+  /**
+   * Display name of that agent. Denormalised so the queue can say "Assigned to
+   * Thandi" without a second read — a uid means nothing on screen.
+   */
+  assignedToName?: string;
   /** Firebase uid of the student who logged it. */
   createdBy: string;
   /** Epoch milliseconds. */

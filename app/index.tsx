@@ -23,7 +23,7 @@ type Health = {
   pending: number;
 };
 
-export default function App() {
+export default function HealthCheckScreen() {
   const [health, setHealth] = useState<Health | null>(null);
   const [error, setError] = useState<string | null>(null);
 

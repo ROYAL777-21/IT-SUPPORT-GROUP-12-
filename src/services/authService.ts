@@ -1,13 +1,11 @@
-// @firebase/auth rather than firebase/auth — see the note in config/firebase.ts.
-// Mixing the two entry points would also mean two different `Auth` types.
 import {
-  User,
   createUserWithEmailAndPassword,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signOut,
   updateProfile,
-} from '@firebase/auth';
+  type User,
+} from '@react-native-firebase/auth';
 
 import { getFirebaseAuth, isFirebaseConfigured } from '@/config/firebase';
 import { resetDatabase } from '@/db/database';

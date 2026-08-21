@@ -7,7 +7,7 @@ import {
   query,
   setDoc,
   where,
-} from 'firebase/firestore';
+} from '@react-native-firebase/firestore';
 
 import { isFirebaseConfigured, getFirestoreDb } from '@/config/firebase';
 import { getDatabase, getSyncMeta, setSyncMeta } from '@/db/database';

@@ -53,6 +53,7 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+
       - name: Write google-services.json
         id: firebase
         env:
@@ -91,6 +92,17 @@ jobs:
           }
           JSON
           fi
+
+      # Gradle bundles the JS itself, so this looks redundant — it is not.
+      # Metro failures surface inside Gradle as "Process 'command 'node''
+      # finished with non-zero exit value 1", buried under 300 lines of Java
+      # stack trace, five minutes in. Running Metro directly puts the real
+      # error on screen in under a minute. This step exists because that is
+      # exactly how the first run of this workflow failed.
+      - name: Check the JS bundles
+        env:
+          EXPO_NO_TELEMETRY: '1'
+        run: npm run bundle:check
 
       - name: Generate the native project
         env:

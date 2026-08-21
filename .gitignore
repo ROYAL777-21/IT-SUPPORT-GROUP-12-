@@ -23,3 +23,7 @@ google-services.json
 GoogleService-Info.plist
 
 .DS_Store
+
+# Output of `npm run bundle:check`
+.expo-bundle-check/
+dist/

@@ -8,7 +8,8 @@
     "android": "expo run:android",
     "typecheck": "tsc --noEmit",
     "doctor": "expo-doctor",
-    "test:rules": "firebase emulators:exec --only firestore \"node --test tests/firestore-rules.test.mjs\""
+    "test:rules": "firebase emulators:exec --only firestore --project campus-it-help-rules-test \"node --test tests/firestore-rules.test.mjs\"",
+    "grant-support": "node scripts/grant-support.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",
@@ -36,7 +37,11 @@
     "react-native-worklets": "^0.10.1"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@types/react": "~19.2.0",
+    "firebase": "^12.18.0",
+    "firebase-admin": "^14.3.0",
+    "firebase-tools": "^15.28.1",
     "typescript": "~5.9.2"
   }
 }

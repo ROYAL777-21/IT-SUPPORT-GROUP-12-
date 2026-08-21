@@ -47,10 +47,15 @@ commitment to an iOS-only build.
 
 **For.** One TypeScript codebase produces both iOS and Android builds, which is
 what makes covering the whole student body affordable. With Expo, the whole team
-can develop on any OS and test on a physical phone through Expo Go — no Mac, no
-provisioning profiles, no paid developer account needed for coursework. Fast
-refresh makes UI work quick, which matters because the UI is being rebuilt from
-a supplied design.
+can develop on any OS and test on a physical phone — no Mac, no provisioning
+profiles, no paid developer account needed for coursework. Fast refresh makes UI
+work quick.
+
+One caveat we hit in practice: **Expo Go is not usable for this app.** It cannot
+handle OAuth redirects for any provider, because the app scheme cannot be
+customised there, and Microsoft sign-in is a requirement. Development happens in
+an EAS development build instead. The convenience cost is real but small — the
+dev client is installed once and then behaves like Expo Go.
 
 **Against, honestly.** JavaScript is slower than compiled Swift, animations can
 drop frames under load, and reaching a native API that has no library means
@@ -70,10 +75,10 @@ any device-only design: there must be a server.
 
 **Why Firebase over a hand-built API:**
 
-- **Auth is solved.** Email/password accounts, password resets, and session
-  persistence come free. Writing our own auth would mean handling password
-  hashing and reset tokens ourselves — a lot of work and an easy thing to get
-  dangerously wrong.
+- **Auth is solved.** Email/password accounts, password resets, session
+  persistence *and* Microsoft (Entra ID) single sign-on come free. Writing our
+  own auth would mean handling password hashing, reset tokens and an OAuth
+  exchange ourselves — a lot of work and an easy thing to get dangerously wrong.
 - **No server to run.** No hosting, no deployment, no uptime to manage during a
   module. Firestore is reachable directly from the app.
 - **Real-time.** Firestore can push changes to a listening client, so a status
@@ -86,6 +91,13 @@ any device-only design: there must be a server.
 document model and moving off it later would mean rewriting the data layer.
 Queries are also more limited than SQL: no joins, and compound filters need
 explicit composite indexes.
+
+**Which Firebase SDK.** We use `@react-native-firebase` (the native SDK) rather
+than the Firebase JavaScript SDK. This was not a preference: the JS SDK
+*cannot* do Microsoft sign-in on React Native at all, and the alternatives that
+work with it both require Firebase's paid Blaze plan. The native SDK does it on
+the free tier with no server code. Reasoning in full in
+[`AUTH.md`](AUTH.md).
 
 ---
 
@@ -109,15 +121,22 @@ down" through an app that requires Wi-Fi.
 
 ### Why not just use Firestore's own offline cache?
 
-A fair question, since Firestore has offline support built in. The catch is that
-the **Firebase Web JS SDK — the one an Expo app uses — persists its cache to
-IndexedDB, which is a browser API that does not exist in React Native.** On a
-phone its cache is therefore in-memory only: it is lost the moment the app is
-killed. Reopening the app with no signal would show nothing.
+A fair question, since Firestore has offline support built in, and the native
+SDK's cache — unlike the JS SDK's, which persists to IndexedDB and so is
+memory-only on a phone — does survive a restart.
 
-SQLite writes to the device filesystem, so the data genuinely survives a
-restart. It also gives us explicit control over what is cached and when it
-syncs, rather than a cache we cannot inspect.
+We still went with SQLite, for two reasons that outlast the SDK choice:
+
+- **Real SQL.** The queue ordering the support screen needs — urgent first,
+  then oldest-waiting first — is an `ORDER BY CASE` expression. Firestore
+  cannot express it without either a denormalised sort key or client-side
+  sorting of the whole collection.
+- **Explicit control.** We decide what is cached, when it syncs, and what
+  happens on sign-out (`resetDatabase()` wipes it, so the next person on a
+  shared phone reads nothing). Firestore's cache is a black box by comparison.
+
+The brief also lists SQLite as one of the tools to evaluate, and "offline-first
+ticketing" is the case it is genuinely built for.
 
 ---
 

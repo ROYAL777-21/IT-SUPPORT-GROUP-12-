@@ -13,15 +13,50 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Applies to both sign-in paths. A Microsoft account from outside the
+    // tenant reaches Firebase with a non-institutional email; the client
+    // rejects and cleans up, and this is what stops it mattering if that
+    // cleanup is bypassed.
     function isInstitutionalEmail() {
       return isSignedIn()
         && request.auth.token.email.matches('.*@(eduvos[.]com|eduvos[.]ac[.]za)$');
     }
 
     // Support agents are marked with a custom claim set from a trusted
-    // environment (Admin SDK / Cloud Function) — never from the app.
+    // environment (scripts/grant-support.ts) — never from the app.
     function isSupportAgent() {
       return isSignedIn() && request.auth.token.support == true;
+    }
+
+    // Fields nobody may rewrite after creation. `createdBy` is the one the
+    // whole read model hangs off; `reference` is what the student quotes at
+    // the IT desk; `createdAt` is evidence of how long they have waited.
+    function immutableFieldsUnchanged() {
+      return request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.reference == resource.data.reference
+        && request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    match /users/{userId} {
+      function isSelf() {
+        return isSignedIn() && request.auth.uid == userId;
+      }
+
+      // Support needs to read profiles to show a student number alongside the
+      // ticket they are working.
+      allow read: if isSelf() || isSupportAgent();
+
+      // `role` is deliberately not writable. It exists on the document only so
+      // the UI can label an agent; the custom claim above is what actually
+      // authorises anything, and letting a user write this field would invite
+      // the assumption that it does something.
+      allow create, update: if isSelf()
+                            && isInstitutionalEmail()
+                            && !("role" in request.resource.data)
+                            && request.resource.data.uid == request.auth.uid;
+
+      // Profiles are not deleted; the account is what gets deleted.
+      allow delete: if false;
     }
 
     match /tickets/{ticketId} {
@@ -29,20 +64,33 @@ service cloud.firestore {
         return isSignedIn() && resource.data.createdBy == request.auth.uid;
       }
 
+      // Support reads the whole queue — that is what makes it a shared queue.
+      // A student can only ever read their own, which is also why a student's
+      // device never receives anyone else's rows to cache.
       allow read: if isOwner() || isSupportAgent();
 
       // A student may only create a ticket under their own uid, and only in
-      // the 'open' state — they cannot log something pre-resolved.
+      // the 'open' state — they cannot log something pre-resolved. Nor may
+      // they hand it to an agent on creation.
       allow create: if isInstitutionalEmail()
                     && request.resource.data.createdBy == request.auth.uid
-                    && request.resource.data.status == 'open';
+                    && request.resource.data.status == 'open'
+                    && request.resource.data.get('assignedTo', null) == null;
 
-      // Students may edit their own ticket but may not reassign it or hand
-      // themselves a different uid. Support agents may change anything.
-      allow update: if isSupportAgent()
-                    || (isOwner()
-                        && request.resource.data.createdBy == resource.data.createdBy
-                        && request.resource.data.assignedTo == resource.data.assignedTo);
+      // Support may change anything except the immutable fields. A student may
+      // edit their own ticket but may not assign it — picking work up is the
+      // agents' side of the transaction.
+      allow update: if immutableFieldsUnchanged()
+                    && (
+                      isSupportAgent()
+                      || (
+                        isOwner()
+                        && request.resource.data.get('assignedTo', null)
+                             == resource.data.get('assignedTo', null)
+                        && request.resource.data.get('assignedToName', null)
+                             == resource.data.get('assignedToName', null)
+                      )
+                    );
 
       allow delete: if isOwner() || isSupportAgent();
 
@@ -58,6 +106,8 @@ service cloud.firestore {
                       && request.resource.data.authorId == request.auth.uid
                       && (isSupportAgent() || parentTicket().createdBy == request.auth.uid)
                       // Only support may post a comment marked as from support.
+                      // Without this a student could impersonate the IT desk in
+                      // their own thread.
                       && (request.resource.data.fromSupport == false || isSupportAgent());
 
         // Comments are an audit trail — no edits, no deletions.

@@ -78,9 +78,12 @@ Put your **Directory (tenant) ID** in `.env` as `EXPO_PUBLIC_AZURE_TENANT_ID`.
 
 ### 3. Build and run
 
-**Expo Go does not work for this app.** It cannot handle OAuth redirects for
-any provider, because the app scheme cannot be customised there. Use a
-development build:
+**Expo Go does not work for this app** — it does not contain
+`@react-native-firebase`'s native code and cannot handle OAuth redirects. That
+is not a fixable setting, and it is not a reason to move off Expo: the blocker
+is the native Firebase module. Use a development build instead, which behaves
+the same once installed. The no-account route is
+[`docs/INSTALL.md`](docs/INSTALL.md); via EAS:
 
 ```bash
 npm install -g eas-cli
@@ -142,54 +145,30 @@ profile.
 
 ## Getting an APK onto a phone
 
-There are two routes. **The GitHub Actions one needs no Expo account, no
-credit card and no local Android setup**, so start there.
+**Full step-by-step, written for groupmates: [`docs/INSTALL.md`](docs/INSTALL.md).**
 
-### Route 1 — GitHub Actions (no accounts needed)
+The short version. `.github/workflows/android-apk.yml` builds two APKs on every
+push, with no Expo account, no EAS and no local Android setup — GitHub's runners
+already have the Android SDK:
 
-`.github/workflows/android-apk.yml` builds an installable APK on every push.
-GitHub's runners already have the Android SDK, and `expo prebuild` generates a
-project whose release build is signed with a stable debug key — stable being
-the part that matters, because it means each new APK installs *over* the last
-one rather than being treated as a different app.
+| Artifact | For | Notes |
+| --- | --- | --- |
+| `…​.apk` | Running the app | Standalone. Install and open. |
+| `…​-devclient.apk` | Developing | Install once, then `npm start` for live reload. **This is the Expo Go replacement.** |
 
-**To download one:**
+Actions → newest green run → **Artifacts**. For a public link that needs no
+GitHub login, push a `v*` tag and the release APK is attached to a GitHub
+Release.
 
-1. Repository → **Actions** → **Build Android APK** → pick the latest run.
-2. Scroll to **Artifacts** and download the `.apk`.
-3. On the phone, open the file and allow installing from that source.
+Builds are signed with the stable debug key that `expo prebuild` generates, so
+successive APKs install over each other rather than being treated as different
+apps. That key is fine for handing builds around; it is not the one to publish
+to the Play Store with.
 
-Artifact downloads require a GitHub login. To get a **public link** — for a
-lecturer, say — push a tag instead, and the APK is attached to a GitHub
-Release that anyone can download:
-
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-**Before the APK is actually usable, add your Firebase config as a secret.**
-Without it the build still succeeds, but the APK is marked `-PLACEHOLDER-no-firebase`
-and cannot sign in or sync — it falls back to SQLite-only.
-
-```bash
-base64 -w0 google-services.json   # macOS: base64 -i google-services.json
-```
-
-Repository → Settings → Secrets and variables → Actions → New repository secret:
-
-| Secret | Value |
-| --- | --- |
-| `GOOGLE_SERVICES_JSON_BASE64` | the base64 string from above |
-| `EXPO_PUBLIC_AZURE_TENANT_ID` | your Entra Directory (tenant) ID |
-
-The debug signing key is fine for handing the APK around directly. It is *not*
-the key to publish to the Play Store with — for that, use the EAS `production`
-profile below.
-
-### Route 2 — EAS Build
-
-Needs a free Expo account. Better for Play Store releases and for iOS.
+**Add your Firebase config as a secret** or the release APK is labelled
+`-PLACEHOLDER-no-firebase` and cannot sign in — `GOOGLE_SERVICES_JSON_BASE64`
+and `EXPO_PUBLIC_AZURE_TENANT_ID`, both covered in
+[`docs/INSTALL.md`](docs/INSTALL.md).
 
 ## Deployment (EAS)
 
@@ -284,6 +263,7 @@ docs/
   FRAMEWORK-EVALUATION.md     React Native vs Swift, Firebase, SQLite — the decisions
   ARCHITECTURE.md             How offline-first sync works
   AUTH.md                     Both sign-in paths, and why the JS SDK could not do Microsoft
+  INSTALL.md                  Getting the app onto a phone — start here
 ```
 
 ## About the design

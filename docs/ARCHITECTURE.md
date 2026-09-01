@@ -68,6 +68,23 @@ transfers just what changed. The cursor lives in the `sync_meta` table. This
 keeps Firestore reads — and the free-tier quota — proportional to real activity
 rather than to collection size.
 
+The scope depends on who is asking. A student pulls `createdBy == uid`; a
+support agent pulls the whole collection, which is what makes the queue shared.
+`firestore.rules` enforces the same split, so a student device issuing the wide
+query is refused rather than trusted.
+
+**Comments are pulled too**, and this is the part that took a second pass to
+get right. Originally they were push-only: `pullRemote()` fetched tickets and
+nothing else, so a support agent's reply could upload and then never reach the
+student's device. The ticket lifecycle had no return path, which quietly made
+the whole thing a write-only log.
+
+The fix pulls each changed ticket's `comments` subcollection after the ticket
+pull. Scoping to *changed* tickets is what keeps it cheap, and it is only
+correct because `addComment()` touches its parent ticket's `updatedAt`. That
+touch looks like bookkeeping and is not: without it, a ticket with a new reply
+would never appear in the changed set, and the reply would never be fetched.
+
 Each pulled document is upserted with a guard:
 
 ```sql
@@ -94,38 +111,62 @@ The one genuine race — support resolving a ticket while the student edits it
 offline — resolves to whichever was written later. Comments are unaffected:
 they are separate append-only rows and never conflict.
 
+## Live updates
+
+`watchForChanges()` subscribes to Firestore and, when something moves, calls
+`sync()`. It never feeds the UI directly — screens still read SQLite alone, so
+the rule at the top of this document holds unchanged. All the listener does is
+replace "pull when the user swipes down" with "pull when there is something to
+pull", which is how a status change from support reaches a student who has no
+reason to think to refresh.
+
+The query is `orderBy('updatedAt', 'desc'), limit(1)`. We only need to know
+*that* something changed; an unbounded listener on a growing queue would bill
+for every document on every change. Snapshots with `hasPendingWrites` are
+ignored — that is the echo of our own push, and it is already local.
+
 ## Concurrency
 
 `sync()` collapses overlapping calls into one in-flight promise. Without that, a
 launch sync and a pull-to-refresh could both push the same pending rows.
 
+Schema migrations run in `withExclusiveTransactionAsync`, not
+`withTransactionAsync`. The plain variant sweeps *any* query that happens to run
+while it is open into the transaction — including reads the UI kicks off at
+launch — and a half-applied schema is not something to leave to timing.
+
 ## What is deliberately not here
 
-- **No Firestore real-time listeners yet.** Sync is pull-based on launch,
-  foreground, and manual refresh. Listeners are a later addition if live status
-  updates are wanted; the local-first shape does not change.
-- **No attachments.** Screenshots of an error would mean Firebase Storage plus a
-  local file cache and an upload queue. Worth adding, out of scope for now.
-- **No support-agent view.** The rules support it (`support` custom claim) and
-  the data model is ready, but the student app is the deliverable.
-- **No web target.** Metro resolves web builds under the `browser` export
-  condition, which yields an `@firebase/auth` build with no
-  `getReactNativePersistence`; `expo-sqlite` needs extra setup in a browser too.
-  Supporting web would mean a separate persistence path for a target nobody
-  asked for.
+- **No attachments.** A screenshot of an error would mean Firebase Storage plus
+  a local file cache and an upload queue of its own. Worth adding; out of scope
+  for now.
+- **No push notifications.** A student finds out about a reply by opening the
+  app. Adding FCM is a self-contained next step.
+- **No web target.** `@react-native-firebase` is native-only by design, and
+  `expo-sqlite` needs extra setup in a browser. Supporting web would mean a
+  second data layer for a target nobody asked for.
 
-## A packaging trap worth knowing about
+## Why the native SDK, not the JS SDK
 
-`getReactNativePersistence` is imported from `@firebase/auth`, **not** from the
-`firebase/auth` umbrella entry. The umbrella package's `exports` map has no
-`react-native` condition, so it always serves the browser bundle — and that
-bundle genuinely does not contain the function. Importing it from there fails at
-runtime, not just at typecheck.
+The Firebase JS SDK was the original choice and had to go: it cannot do
+Microsoft sign-in on React Native at all. The full reasoning is in
+[`AUTH.md`](AUTH.md).
 
-TypeScript needs a nudge too. `@firebase/auth` *does* have a `react-native`
-condition, but its `exports` map lists the generic `"types"` key **before** it,
-and conditional exports match in declaration order — so tsc always lands on the
-browser typings. `tsconfig.json` maps `@firebase/auth` directly to
-`dist/rn/index.rn.d.ts` so the types match the build Metro actually loads on
-device.
+Two things improved as a side effect:
 
+- **Session persistence is free.** The web SDK needed `initializeAuth()` with
+  `getReactNativePersistence(AsyncStorage)` wired by hand, imported from
+  `@firebase/auth` rather than `firebase/auth` because the umbrella package
+  serves a browser bundle that genuinely does not contain that function. The
+  native SDK keeps the session in platform storage on its own.
+- **The typings stopped lying.** `tsconfig.json` used to map `@firebase/auth`
+  straight at `dist/rn/index.rn.d.ts`, because the package's `exports` map
+  lists the generic `"types"` key before `"react-native"` and conditional
+  exports match in declaration order — so tsc always landed on the browser
+  typings while Metro loaded the RN build. That mapping is gone.
+
+One typing gap remains, in the other direction: RNFirebase declares
+`providerId` private on its `OAuthProvider` class, so the class does not
+structurally satisfy the `AuthProvider` interface its own `signInWithPopup`
+asks for. The runtime object is exactly what the native bridge expects; only
+the declaration is wrong. `authService.ts` casts at the single call site.

@@ -4,185 +4,276 @@ Mobile app for logging and tracking campus IT support tickets at Eduvos.
 
 Group 12 · IT Support
 
-**Stack:** React Native (Expo) · Firebase Auth + Firestore · SQLite (offline-first).
+**Stack:** React Native (Expo SDK 57) · Firebase Auth + Firestore via
+`@react-native-firebase` · SQLite (offline-first).
 The reasoning behind each of those is in [`docs/FRAMEWORK-EVALUATION.md`](docs/FRAMEWORK-EVALUATION.md).
 
 ---
 
 ## Status
 
-The **data layer is built and the app runs.** The **UI is not built yet** — it is
-blocked on the design files (see below).
+The app is complete: both the student side and the IT support side.
 
 | Area | State |
 | --- | --- |
 | SQLite schema + migrations | Done |
 | Offline-first ticket repository | Done |
-| Firestore two-way sync | Done |
-| Firebase Auth (email/password, domain-restricted) | Done |
-| Firestore security rules | Done |
-| EAS build + submit config | Done — needs `eas init` and env vars uploaded |
-| App screens | **Blocked on design files** |
+| Firestore two-way sync, including comments | Done |
+| Live updates via Firestore listener | Done |
+| Email sign-in, registration, password reset | Done |
+| **Microsoft (Entra ID) sign-in** | Done |
+| Roles via `support` custom claim | Done |
+| Student screens — list, log, track, reply | Done |
+| Support screens — queue, assign, status, reply | Done |
+| Firestore security rules | Done, **25 rules tests passing** |
+| EAS build + submission config | Done — needs `eas init` and env vars uploaded |
+| **APK build in GitHub Actions** | Done — no Expo account needed, see [below](#getting-an-apk-onto-a-phone) |
 
-`App.tsx` is a placeholder health-check screen, not the real UI. It exists so
-the data layer can be verified end to end before the screens are built, and it
-gets replaced once the design lands.
+**Before it runs you need a Firebase project and an Azure app registration.**
+Both are free. See [Setup](#setup).
 
-## Getting the design files in
+## What it does
 
-The screens are built from the Campus IT Help mockups. Those source files are
-**not yet in this repo** and need to be added before UI work can start:
+A student signs in with their Eduvos email or their Eduvos Microsoft account,
+gives their student number and campus once, and logs a ticket. The ticket
+saves to the phone immediately — **including with no signal at all**, which is
+the point, since the most common thing to report is that the Wi-Fi is down. It
+uploads by itself once there is a connection.
 
-- `Campus IT Help.dc.html` — the screens
-- `ds-styles.css` — design tokens (colours, type, spacing)
-- `support.js` — support logic; the source of truth for ticket categories
-- `assets/eduvos-logo.jpg` — branding
-- `ios-frame.jsx` — device frame used to present the mockups (presentation only, not app code)
-
-Once they are here, `ds-styles.css` becomes the app's theme constants and
-`support.js` is reconciled against `src/models/ticket.ts`.
+An IT support agent gets a shared queue: filter it, assign a ticket to
+themselves, change its status, and reply. The student sees the reply on their
+phone without having to refresh.
 
 ## Setup
 
 ```bash
 npm install
-cp .env.example .env      # then fill in from the Firebase console
-npm start
+cp .env.example .env
 ```
 
-Press `a` for Android, or scan the QR code with Expo Go.
-
-**Android is the target platform.** The app code is platform-agnostic — there is
-no `Platform.OS` branching anywhere in `src/` — so iOS remains available later
-without a rewrite. Only the build and release setup is Android-specific. The
-iOS block in `app.json` is kept for that reason; it costs nothing and reserves
-the bundle identifier.
-
-**There is deliberately no web target.** On web, Metro resolves packages under
-the `browser` export condition, which gives a build of `@firebase/auth` that
-does not contain `getReactNativePersistence`, so auth would fail to initialise.
-`expo-sqlite` also needs extra setup to run in a browser. Rather than ship a
-target that breaks, `expo start --web` is not wired up.
-
-The app **runs without Firebase configured** — it falls back to SQLite-only and
-never syncs. That is deliberate: it keeps the app testable before anyone has set
-up the Firebase project.
-
-### Firebase project setup
+### 1. Firebase project
 
 1. Create a project at [console.firebase.google.com](https://console.firebase.google.com).
-2. Add a **Web** app (not iOS/Android — the Expo build uses the JS SDK). Copy the
-   config values into `.env`.
-3. Enable **Authentication → Sign-in method → Email/Password**.
+2. **Add an Android app** with package name `za.ac.eduvos.campusithelp`.
+   Download `google-services.json` into the project root.
+   (An **iOS** app and `GoogleService-Info.plist` too, if you want iOS later.)
+3. **Authentication → Sign-in method** → enable **Email/Password** *and*
+   **Microsoft**.
 4. Create a **Firestore** database.
-5. Deploy the rules: `firebase deploy --only firestore:rules`.
+5. Deploy the rules and indexes:
+   ```bash
+   npx firebase-tools deploy --only firestore
+   ```
+   The indexes are committed in `firestore.indexes.json`, so this saves you
+   hitting a "this query needs an index" error later and clicking through a
+   console link.
+
+### 2. Microsoft sign-in (Azure / Entra ID)
+
+Enabling the Microsoft provider in Firebase asks for an Azure client ID and
+secret, and shows you a callback URL. Full walkthrough — including the redirect
+URI that trips everyone up — is in [`docs/AUTH.md`](docs/AUTH.md).
+
+Put your **Directory (tenant) ID** in `.env` as `EXPO_PUBLIC_AZURE_TENANT_ID`.
+
+### 3. Build and run
+
+**Expo Go does not work for this app** — it does not contain
+`@react-native-firebase`'s native code and cannot handle OAuth redirects. That
+is not a fixable setting, and it is not a reason to move off Expo: the blocker
+is the native Firebase module. Use a development build instead, which behaves
+the same once installed. The no-account route is
+[`docs/INSTALL.md`](docs/INSTALL.md); via EAS:
+
+```bash
+npm install -g eas-cli
+eas login
+eas init                                    # writes extra.eas.projectId
+eas build --profile development --platform android
+```
+
+Install the resulting APK on your phone, then:
+
+```bash
+npm start        # expo start --dev-client
+```
+
+You only rebuild the dev client when native config changes — adding a package
+with native code, or changing `scheme`. Day-to-day JavaScript changes reload
+over the network as usual.
+
+To build locally instead of on EAS:
+
+```bash
+npx expo prebuild --clean --platform android
+npx expo run:android
+```
+
+## Making someone an IT support agent
+
+Support is a **custom claim** on the Firebase account, granted from a trusted
+environment — never from the app.
+
+```bash
+# Firebase console -> Project settings -> Service accounts -> Generate new private key
+export GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/service-account.json
+
+npm run grant-support -- itdesk@eduvos.com
+npm run grant-support -- itdesk@eduvos.com --revoke
+```
+
+They must sign out and back in for it to take effect — ID tokens are cached for
+up to an hour.
+
+Keep the service account key out of the repository. It is a full-project
+credential, far more dangerous than anything else here.
+
+## Tests
+
+```bash
+npm run typecheck    # tsc --noEmit
+npm run test:rules   # 25 rules tests against the Firestore emulator
+npm run doctor       # expo-doctor
+```
+
+`test:rules` needs Java (for the emulator) but no Firebase project and no
+device — it runs entirely locally, which is why it is the check worth running
+in CI. It covers the things that would actually hurt: a student reading another
+student's ticket, assigning work to themselves, posting a comment that claims
+to be from IT support, or promoting themselves to support by editing their own
+profile.
+
+## Getting an APK onto a phone
+
+**Full step-by-step, written for groupmates: [`docs/INSTALL.md`](docs/INSTALL.md).**
+
+The short version. `.github/workflows/android-apk.yml` builds two APKs on every
+push, with no Expo account, no EAS and no local Android setup — GitHub's runners
+already have the Android SDK:
+
+| Artifact | For | Notes |
+| --- | --- | --- |
+| `…​.apk` | Running the app | Standalone. Install and open. |
+| `…​-devclient.apk` | Developing | Install once, then `npm start` for live reload. **This is the Expo Go replacement.** |
+
+Actions → newest green run → **Artifacts**. For a public link that needs no
+GitHub login, push a `v*` tag and the release APK is attached to a GitHub
+Release.
+
+Builds are signed with the stable debug key that `expo prebuild` generates, so
+successive APKs install over each other rather than being treated as different
+apps. That key is fine for handing builds around; it is not the one to publish
+to the Play Store with.
+
+**Add your Firebase config as a secret** or the release APK is labelled
+`-PLACEHOLDER-no-firebase` and cannot sign in — `GOOGLE_SERVICES_JSON_BASE64`
+and `EXPO_PUBLIC_AZURE_TENANT_ID`, both covered in
+[`docs/INSTALL.md`](docs/INSTALL.md).
 
 ## Deployment (EAS)
 
-Builds and store submissions go through **EAS** — Expo's cloud build service.
 Profiles are defined in `eas.json`.
-
-### One-time setup
-
-```bash
-npm install -g eas-cli     # not a project dependency; eas.json pins the version
-eas login
-eas init                   # creates the EAS project, writes extra.eas.projectId to app.json
-```
-
-`eas init` is what adds `owner` and `extra.eas.projectId` to `app.json`. Those
-are intentionally absent right now — they identify a specific EAS account, so
-they get generated rather than committed ahead of time.
-
-### Environment variables — do this before the first build
-
-**This is the step that silently breaks builds if skipped.** `.env` is
-gitignored, so EAS build servers never see it. Without these, the app builds
-fine but ships with Firebase unconfigured and runs SQLite-only, syncing nothing.
-
-Upload each value once per environment:
-
-```bash
-eas env:set --name EXPO_PUBLIC_FIREBASE_API_KEY             --value "..." --environment production --visibility plaintext
-eas env:set --name EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN         --value "..." --environment production --visibility plaintext
-eas env:set --name EXPO_PUBLIC_FIREBASE_PROJECT_ID          --value "..." --environment production --visibility plaintext
-eas env:set --name EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET      --value "..." --environment production --visibility plaintext
-eas env:set --name EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID --value "..." --environment production --visibility plaintext
-eas env:set --name EXPO_PUBLIC_FIREBASE_APP_ID              --value "..." --environment production --visibility plaintext
-```
-
-Repeat with `--environment preview` (and `development`) — or set them in the
-project's Environment variables page on expo.dev, which is less typing.
-
-`plaintext` is correct here: anything with an `EXPO_PUBLIC_` prefix is compiled
-into the app bundle and readable by anyone who installs it. Marking them
-`secret` would not hide them and would stop the build from reading them.
-Firebase security rules are what protect the data.
-
-To pull them back down for local work: `eas env:pull --environment development`.
-
-### Build profiles
 
 | Profile | Output | Use |
 | --- | --- | --- |
-| `development` | Dev client APK | Day-to-day development with native debugging |
+| `development` | Dev client APK | Day-to-day development |
 | `preview` | APK, internal distribution | Hand to groupmates or the lecturer — installs directly, no store |
 | `production` | AAB | Play Store submission |
 
 ```bash
 eas build --profile preview    --platform android
 eas build --profile production --platform android
+eas submit --profile production --platform android
 ```
 
-`preview` is the one to reach for when demoing. It produces an APK anyone can
-sideload from a link — no store review, no device registration, no cost.
+`preview` is the one to reach for when demoing: an APK anyone can sideload from
+a link, no store review, no device registration, no cost. A Google Play
+Developer account (one-off fee) is only needed to publish to the Play Store.
 
-Android needs no paid developer account to build or sideload. A Google Play
-Developer account (one-off fee) is only required to publish to the Play Store,
-not to distribute an APK to your group or lecturer.
+### Environment variables — do this before the first build
+
+**This is the step that silently breaks builds if skipped.**
+
+`google-services.json` is gitignored, so EAS build servers never see it. Upload
+it as a **file-type** environment variable:
+
+```bash
+eas env:create --name GOOGLE_SERVICES_JSON --type file \
+  --value ./google-services.json --environment production --visibility plaintext
+```
+
+Repeat for `preview` and `development`. `app.config.ts` reads
+`process.env.GOOGLE_SERVICES_JSON` and falls back to the local path, so the
+same config works on your machine and on EAS.
+
+Then the tenant ID:
+
+```bash
+eas env:create --name EXPO_PUBLIC_AZURE_TENANT_ID \
+  --value "..." --environment production --visibility plaintext
+```
+
+`plaintext` is correct: anything with an `EXPO_PUBLIC_` prefix is compiled into
+the app bundle and readable by anyone who installs it, and `google-services.json`
+is not a secret either. Firebase security rules are what protect the data.
+
+If the CLI flags shift between EAS versions, the project's **Environment
+variables** page on [expo.dev](https://expo.dev) does the same thing with less
+typing — that page is also where you confirm the file variable actually
+uploaded. `eas env:pull --environment development` brings them back down for
+local work.
 
 ### Versioning
 
 `cli.appVersionSource` is `remote`, so EAS owns the build number and
-`production` has `autoIncrement` on — build numbers advance by themselves. Bump
-the user-facing `version` in `app.json` by hand for releases.
+`production` has `autoIncrement` on. Bump the user-facing `version` in
+`app.config.ts` by hand for releases.
 
-### Store submission
-
-```bash
-eas submit --profile production --platform android
-```
-
-`submit.production` in `eas.json` is intentionally empty — it needs a Google
-Play service-account key, which is an account credential rather than repository
-content. EAS prompts for it on first run and stores it against the project.
-
-Firestore needs one composite index for the sync query
-(`createdBy` ascending, `updatedAt` ascending). The first sync will fail with a
-console link that creates it in one click.
+**Android is the target platform.** There is no `Platform.OS` branching
+anywhere in `src/`, so iOS remains a build target rather than a rewrite. The
+iOS config is kept for that reason.
 
 ## Layout
 
 ```
-App.tsx                       Placeholder health check — replaced by the real UI
-app.json                      Expo app config — name, bundle ids, plugins
-eas.json                      EAS build profiles and store submission config
-firestore.rules               Server-side authorisation (the enforcement that counts)
+app/                          expo-router routes
+  _layout.tsx                 Theme + Auth + Sync providers, splash gate
+  (auth)/                     Sign in, register, password reset
+  (app)/
+    onboarding.tsx            Student number + campus, asked once
+    (tabs)/                   My tickets · New · Queue (support only) · Profile
+    ticket/[id].tsx           Detail, comment thread, status + assign actions
 src/
-  config/firebase.ts          Firebase init, RN auth persistence, configured-or-not flag
-  models/ticket.ts            Ticket/comment types, categories, statuses
-  db/
-    schema.ts                 SQLite DDL + versioned migrations
-    database.ts               Connection, migration runner, sync bookkeeping
+  config/firebase.ts          Native SDK accessors
+  models/                     Ticket and user domain types
+  db/                         SQLite DDL, versioned migrations, connection
   services/
     ticketRepository.ts       All CRUD — local only, never blocks on network
-    syncService.ts            Push pending, then pull remote
-    authService.ts            Sign in/up/out, institutional email check
-  utils/id.ts                 UUIDs for local rows
+    syncService.ts            Push pending, pull remote, watch for changes
+    authService.ts            Email + Microsoft sign-in, roles
+    profileService.ts         users/{uid}
+  hooks/                      useAuth, useSync, useTickets
+  theme/                      Design tokens and provider
+  components/                 The component library
+scripts/grant-support.mjs     Grants the `support` custom claim
+tests/firestore-rules.test.mjs
+firestore.rules               Server-side authorisation (the enforcement that counts)
+firestore.indexes.json        Composite indexes the sync queries need
 docs/
   FRAMEWORK-EVALUATION.md     React Native vs Swift, Firebase, SQLite — the decisions
   ARCHITECTURE.md             How offline-first sync works
+  AUTH.md                     Both sign-in paths, and why the JS SDK could not do Microsoft
+  INSTALL.md                  Getting the app onto a phone — start here
 ```
+
+## About the design
+
+The Campus IT Help mockups (`ds-styles.css`, `support.js`, the logo) were never
+added to this repo, so the UI is built from a design system defined in
+`src/theme/tokens.ts`. That file is the single place any colour, spacing value
+or type size is written down — every component reads from it. If the mockups
+turn up, porting them means rewriting that one file rather than hunting hex
+codes through the screens.
 
 ## How the offline-first part works
 
@@ -191,7 +282,7 @@ action waits on the network.
 
 1. A write goes to SQLite immediately and is flagged `sync_state = 'pending'`.
 2. `syncService.sync()` pushes pending rows to Firestore, then pulls anything
-   changed since the last pull.
+   changed since the last pull — tickets *and* their comment threads.
 3. Conflicts resolve last-write-wins on `updatedAt` — but a row with unpushed
    local edits is never overwritten by the pull.
 

@@ -62,6 +62,48 @@ export const MIGRATIONS: Migration[] = [
       );`,
     ],
   },
+
+  {
+    version: 2,
+    statements: [
+      /*
+       * Local cache of `users/{uid}`. Keeps the profile screen and the
+       * pre-filled ticket form working offline, and means a student types
+       * their student number once rather than on every ticket.
+       */
+      `CREATE TABLE IF NOT EXISTS user_profiles (
+        uid            TEXT PRIMARY KEY NOT NULL,
+        email          TEXT NOT NULL,
+        display_name   TEXT NOT NULL,
+        student_number TEXT,
+        campus         TEXT,
+        role           TEXT NOT NULL DEFAULT 'student',
+        provider_id    TEXT NOT NULL DEFAULT 'unknown',
+        created_at     INTEGER NOT NULL,
+        updated_at     INTEGER NOT NULL
+      );`,
+
+      /*
+       * Denormalised so the queue can show "Assigned to Thandi" without a
+       * second read. `assigned_to` alone is a uid and means nothing on screen.
+       */
+      `ALTER TABLE tickets ADD COLUMN assigned_to_name TEXT;`,
+
+      /*
+       * Support agents list the queue by status and recency, which the
+       * created_by index cannot serve.
+       */
+      `CREATE INDEX IF NOT EXISTS idx_tickets_status
+         ON tickets (status, updated_at DESC);`,
+
+      `CREATE INDEX IF NOT EXISTS idx_tickets_assigned
+         ON tickets (assigned_to, updated_at DESC);`,
+
+      /* Comments are pulled now, not just pushed, so they need a sync index. */
+      `CREATE INDEX IF NOT EXISTS idx_comments_sync_state
+         ON ticket_comments (sync_state);`,
+    ],
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

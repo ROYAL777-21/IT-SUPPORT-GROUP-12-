@@ -1,63 +1,43 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-// Auth is imported from @firebase/auth, not the firebase/auth umbrella entry.
-// The umbrella build has no "react-native" export condition, so it ships the
-// browser bundle — which genuinely does not contain getReactNativePersistence.
-// Importing it from there fails at runtime, not just at typecheck.
-import { Auth, getReactNativePersistence, initializeAuth } from '@firebase/auth';
-import { FirebaseApp, getApp, getApps, initializeApp } from 'firebase/app';
-import { Firestore, getFirestore } from 'firebase/firestore';
-
-const firebaseConfig = {
-  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
-};
+import { getApps, type FirebaseApp } from '@react-native-firebase/app';
+import { getAuth, type Auth } from '@react-native-firebase/auth';
+import { getFirestore, type Firestore } from '@react-native-firebase/firestore';
 
 /**
- * True when .env has actually been filled in. The app is deliberately usable
- * without it — SQLite alone backs the whole UI — so a missing config degrades
- * to "offline forever" rather than crashing on launch.
+ * Firebase access for the native SDK (@react-native-firebase).
+ *
+ * There is no JS-side initialisation here on purpose. The native Android and
+ * iOS SDKs read `google-services.json` / `GoogleService-Info.plist` at process
+ * start and register the default app before any JavaScript runs, so calling
+ * initializeApp() from here would be both redundant and wrong.
+ *
+ * This also means session persistence is free: the native SDK keeps the signed
+ * -in user in platform storage, so the AsyncStorage persistence the web JS SDK
+ * needed is gone — along with the @firebase/auth packaging trap that came with
+ * it.
  */
-export const isFirebaseConfigured = Boolean(
-  firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.appId,
-);
 
-let app: FirebaseApp | null = null;
-let authInstance: Auth | null = null;
-let firestoreInstance: Firestore | null = null;
+/**
+ * True when the native SDK found a valid config file and registered the default
+ * app. The app is deliberately usable without it — SQLite alone backs the whole
+ * UI — so a missing google-services.json degrades to "offline forever" rather
+ * than crashing on launch.
+ */
+export const isFirebaseConfigured: boolean = getApps().length > 0;
 
-function getFirebaseApp(): FirebaseApp {
-  if (!isFirebaseConfigured) {
-    throw new Error(
-      'Firebase is not configured. Copy .env.example to .env and fill in the values from the Firebase console.',
-    );
-  }
+function requireApp(): FirebaseApp {
+  const [app] = getApps();
   if (!app) {
-    app = getApps().length ? getApp() : initializeApp(firebaseConfig as Record<string, string>);
+    throw new Error(
+      'Firebase is not configured. Add google-services.json to the project root and rebuild the development client — see README.md.',
+    );
   }
   return app;
 }
 
-/**
- * Auth must be created with initializeAuth (not getAuth) on React Native,
- * otherwise the session is held in memory only and the student is signed out
- * every time the app is killed.
- */
 export function getFirebaseAuth(): Auth {
-  if (!authInstance) {
-    authInstance = initializeAuth(getFirebaseApp(), {
-      persistence: getReactNativePersistence(AsyncStorage),
-    });
-  }
-  return authInstance;
+  return getAuth(requireApp());
 }
 
 export function getFirestoreDb(): Firestore {
-  if (!firestoreInstance) {
-    firestoreInstance = getFirestore(getFirebaseApp());
-  }
-  return firestoreInstance;
+  return getFirestore(requireApp());
 }

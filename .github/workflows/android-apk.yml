@@ -1,0 +1,179 @@
+name: Build Android APK
+
+# Produces an installable APK without EAS, without an Expo account, and
+# without any secrets. GitHub's ubuntu runners ship the Android SDK, and
+# `expo prebuild` generates a project whose release build is signed with a
+# stable debug keystore — stable being the part that matters, since it means
+# each new APK installs over the last one instead of being treated as a
+# different app.
+#
+# Where the APK ends up:
+#   - every run  -> Actions -> the run -> Artifacts (login required to download)
+#   - a v* tag   -> Releases (public link, no login) — use this for handing out
+
+on:
+  push:
+    # Feature branches are included on purpose: workflow_dispatch only shows up
+    # in the Actions UI once the workflow exists on the default branch, so
+    # without this there would be no way to get an APK before merging.
+    branches: [main, 'claude/**']
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build ${{ matrix.label }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    strategy:
+      # A dev-client failure must not stop the release APK from being produced,
+      # and vice versa — they serve different people.
+      fail-fast: false
+      matrix:
+        include:
+          # What you hand to a groupmate or the lecturer. JS is bundled in, so
+          # it runs standalone with no laptop involved.
+          - variant: release
+            label: release APK
+            gradle: assembleRelease
+            apk: android/app/build/outputs/apk/release/app-release.apk
+            suffix: ''
+          # The Expo Go replacement. A debug build with expo-dev-client present
+          # ships the dev launcher and loads JS from Metro instead of embedding
+          # it, so you install it once and then get fast refresh forever.
+          - variant: debug
+            label: dev client
+            gradle: assembleDebug
+            apk: android/app/build/outputs/apk/debug/app-debug.apk
+            suffix: '-devclient'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # AGP 8 / React Native 0.86 need JDK 17.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Cheap, and it fails in seconds instead of after a ten-minute Gradle run.
+      - name: Typecheck
+        run: npm run typecheck
+
+
+      - name: Write google-services.json
+        id: firebase
+        env:
+          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON_BASE64" ]; then
+            echo "$GOOGLE_SERVICES_JSON_BASE64" | base64 -d > google-services.json
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "Using the real Firebase config from repository secrets."
+          else
+            # The RNFirebase Gradle plugin refuses to build without this file,
+            # so stand in a structurally valid one. The app is designed to
+            # degrade to SQLite-only when Firebase is unreachable, so the APK
+            # still installs and runs — it just cannot sign in or sync.
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Firebase not configured::No GOOGLE_SERVICES_JSON_BASE64 secret. Building a placeholder APK — sign-in and sync will NOT work. See README."
+            cat > google-services.json <<'JSON'
+          {
+            "project_info": {
+              "project_number": "000000000000",
+              "project_id": "campus-it-help-placeholder",
+              "storage_bucket": "campus-it-help-placeholder.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:0000000000000000000000",
+                  "android_client_info": { "package_name": "za.ac.eduvos.campusithelp" }
+                },
+                "oauth_client": [],
+                "api_key": [{ "current_key": "AIzaSyAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" }],
+                "services": { "appinvite_service": { "other_platform_oauth_client": [] } }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          JSON
+          fi
+
+      # Gradle bundles the JS itself, so this looks redundant — it is not.
+      # Metro failures surface inside Gradle as "Process 'command 'node''
+      # finished with non-zero exit value 1", buried under 300 lines of Java
+      # stack trace, five minutes in. Running Metro directly puts the real
+      # error on screen in under a minute. This step exists because that is
+      # exactly how the first run of this workflow failed.
+      - name: Check the JS bundles
+        env:
+          EXPO_NO_TELEMETRY: '1'
+        run: npm run bundle:check
+
+      - name: Generate the native project
+        env:
+          EXPO_NO_TELEMETRY: '1'
+          EXPO_PUBLIC_AZURE_TENANT_ID: ${{ secrets.EXPO_PUBLIC_AZURE_TENANT_ID }}
+        run: npx expo prebuild --clean --platform android --no-install
+
+      - name: Build the ${{ matrix.label }}
+        working-directory: android
+        env:
+          EXPO_PUBLIC_AZURE_TENANT_ID: ${{ secrets.EXPO_PUBLIC_AZURE_TENANT_ID }}
+        run: ./gradlew ${{ matrix.gradle }} --no-daemon --stacktrace
+
+      - name: Name the APK
+        id: apk
+        run: |
+          SRC='${{ matrix.apk }}'
+          SUFFIX='${{ matrix.suffix }}'
+          # Only the release APK is meaningfully crippled without Firebase; the
+          # dev client is for developers who will have the config anyway.
+          if [ "${{ steps.firebase.outputs.configured }}" = "false" ] && [ "${{ matrix.variant }}" = "release" ]; then
+            SUFFIX="${SUFFIX}-PLACEHOLDER-no-firebase"
+          fi
+          NAME="campus-it-help-${GITHUB_REF_NAME//\//-}-$(echo "$GITHUB_SHA" | cut -c1-7)${SUFFIX}.apk"
+          cp "$SRC" "$NAME"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          ls -lh "$NAME"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.apk.outputs.name }}
+          path: ${{ steps.apk.outputs.name }}
+          retention-days: 30
+          if-no-files-found: error
+
+      # A tag turns the APK into a public download link that needs no GitHub
+      # login — which is what you want when sending it to a lecturer.
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v') && matrix.variant == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.apk.outputs.name }}
+          generate_release_notes: true
+          body: |
+            Sideload-ready APK for Android.
+
+            **Install:** download the `.apk` below on your phone, open it, and allow
+            installing from this source when prompted.
+
+            Signed with the standard Android debug key, which is fine for direct
+            distribution and means updates install over previous versions. It is
+            not the key you would publish to the Play Store with.

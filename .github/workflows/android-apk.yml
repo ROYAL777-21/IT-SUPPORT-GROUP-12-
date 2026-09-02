@@ -13,10 +13,7 @@ name: Build Android APK
 
 on:
   push:
-    # Feature branches are included on purpose: workflow_dispatch only shows up
-    # in the Actions UI once the workflow exists on the default branch, so
-    # without this there would be no way to get an APK before merging.
-    branches: [main, 'claude/**']
+    branches: [main]
     tags: ['v*']
   pull_request:
     branches: [main]

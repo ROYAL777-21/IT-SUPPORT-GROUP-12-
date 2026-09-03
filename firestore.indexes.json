@@ -1,7 +1,31 @@
 {
+  "//": [
+    "Composite indexes for the queries in src/services/syncService.ts.",
+    "",
+    "Those are the ONLY queries that reach Firestore. Every screen reads SQLite",
+    "instead (see docs/ARCHITECTURE.md), so the support queue's ordering is a SQL",
+    "CASE expression in ticketRepository.listQueue() and needs nothing here.",
+    "",
+    "The full Firestore query inventory, and why each does or does not need an entry:",
+    "",
+    "  pullRemote, student   where createdBy == uid AND updatedAt > cursor",
+    "                        -> two fields, COMPOSITE, indexed below",
+    "  watchForChanges, stu. where createdBy == uid, orderBy updatedAt desc",
+    "                        -> two fields, COMPOSITE, indexed below",
+    "  pullRemote, support   where updatedAt > cursor",
+    "                        -> single field, automatic, no entry needed",
+    "  watchForChanges, sup. orderBy updatedAt desc",
+    "                        -> single field, automatic, no entry needed",
+    "  pullComments          where createdAt > cursor, on tickets/{id}/comments",
+    "                        -> single field, automatic, no entry needed",
+    "",
+    "Firestore creates single-field indexes for every field by default, which is",
+    "why the three support/comment queries are absent rather than forgotten.",
+    "Add an entry here only if a query gains a second field."
+  ],
   "indexes": [
     {
-      "//": "syncService.pullRemote() for a student: their own tickets, changed since the last pull.",
+      "//": "pullRemote() for a student: their own tickets, changed since the last pull.",
       "collectionGroup": "tickets",
       "queryScope": "COLLECTION",
       "fields": [

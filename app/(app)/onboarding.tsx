@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, View } from 'react-native';
+import { View } from 'react-native';
 
 import { Button, Screen, Select, Text, TextField } from '@/components';
 import { useAuth } from '@/hooks/useAuth';
@@ -71,59 +71,57 @@ export default function OnboardingScreen() {
         />
       }
     >
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={{ paddingTop: spacing.xxl, gap: spacing.xs }}>
-          <Text variant="title">A few details</Text>
-          <Text tone="muted">
-            {isSupport
-              ? 'Confirm how your name should appear to students on the tickets you pick up.'
-              : 'We ask once, so you never have to type them on a ticket again.'}
+      <View style={{ paddingTop: spacing.xxl, gap: spacing.xs }}>
+        <Text variant="title">A few details</Text>
+        <Text tone="muted">
+          {isSupport
+            ? 'Confirm how your name should appear to students on the tickets you pick up.'
+            : 'We ask once, so you never have to type them on a ticket again.'}
+        </Text>
+      </View>
+
+      <View style={{ marginTop: spacing.xl, gap: spacing.lg }}>
+        <TextField
+          label="Full name"
+          required
+          value={name}
+          onChangeText={setName}
+          autoCapitalize="words"
+          error={submitted ? nameError : null}
+          editable={!saving}
+        />
+
+        {!isSupport ? (
+          <>
+            <TextField
+              label="Student number"
+              required
+              value={studentNumber}
+              onChangeText={setStudentNumber}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              error={submitted ? studentNumberError : null}
+              editable={!saving}
+            />
+
+            <Select
+              label="Campus"
+              required
+              value={campus}
+              options={CAMPUS_OPTIONS}
+              onChange={setCampus}
+              placeholder="Choose your campus"
+              error={submitted ? campusError : null}
+            />
+          </>
+        ) : null}
+
+        {error ? (
+          <Text variant="caption" tone="danger">
+            {error}
           </Text>
-        </View>
-
-        <View style={{ marginTop: spacing.xl, gap: spacing.lg }}>
-          <TextField
-            label="Full name"
-            required
-            value={name}
-            onChangeText={setName}
-            autoCapitalize="words"
-            error={submitted ? nameError : null}
-            editable={!saving}
-          />
-
-          {!isSupport ? (
-            <>
-              <TextField
-                label="Student number"
-                required
-                value={studentNumber}
-                onChangeText={setStudentNumber}
-                autoCapitalize="characters"
-                autoCorrect={false}
-                error={submitted ? studentNumberError : null}
-                editable={!saving}
-              />
-
-              <Select
-                label="Campus"
-                required
-                value={campus}
-                options={CAMPUS_OPTIONS}
-                onChange={setCampus}
-                placeholder="Choose your campus"
-                error={submitted ? campusError : null}
-              />
-            </>
-          ) : null}
-
-          {error ? (
-            <Text variant="caption" tone="danger">
-              {error}
-            </Text>
-          ) : null}
-        </View>
-      </KeyboardAvoidingView>
+        ) : null}
+      </View>
     </Screen>
   );
 }

@@ -1,11 +1,5 @@
 import { useState } from 'react';
-import {
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { FlatList, StyleSheet, View } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -116,10 +110,11 @@ export default function TicketDetailScreen() {
       padded={false}
       edges={['left', 'right']}
       footer={
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={{ gap: spacing.sm }}
-        >
+        // No KeyboardAvoidingView here: Screen wraps the footer in one. This
+        // composer is the reason that had to move — a footer nested inside the
+        // old per-screen KAV sat *below* it, so on Android the keyboard covered
+        // the reply box and the Send button outright.
+        <View style={{ gap: spacing.sm }}>
           <TextField
             label={isSupport ? 'Reply to the student' : 'Add a message'}
             value={reply}
@@ -139,7 +134,7 @@ export default function TicketDetailScreen() {
             disabled={!reply.trim()}
             onPress={() => void postReply()}
           />
-        </KeyboardAvoidingView>
+        </View>
       }
     >
       <Stack.Screen options={{ title: ticket.reference }} />
@@ -147,6 +142,11 @@ export default function TicketDetailScreen() {
       <FlatList
         data={comments}
         keyExtractor={(comment) => comment.id}
+        // With the reply keyboard up, a tap first dismisses it and is otherwise
+        // swallowed — "handled" lets the assign/status buttons in the header
+        // fire on that same first tap instead of needing a second one.
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         contentContainerStyle={{
           paddingHorizontal: spacing.lg,
           paddingBottom: spacing.xl,

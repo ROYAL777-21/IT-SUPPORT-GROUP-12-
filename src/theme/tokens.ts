@@ -8,18 +8,36 @@
  * this one file rather than hunting hex codes through the screens.
  */
 
-/** Eduvos brand red, and the ramp derived from it. */
+/**
+ * Eduvos brand navy, and the ramp derived from it.
+ *
+ * Eduvos brands on navy with a turquoise accent — an earlier revision of this
+ * file used red, which was simply wrong.
+ *
+ * The exact hexes below are matched by eye, not taken from the brand guide:
+ * `ds-styles.css` from the design project holds the authoritative values and is
+ * still not in the repo. When it lands, replace BRAND and TEAL here and the
+ * whole app follows — that is the entire reason colours live in one file.
+ */
 const BRAND = {
-  50: '#fdecec',
-  100: '#f9c9c9',
-  200: '#f19d9d',
-  300: '#e77070',
-  400: '#dc4b4b',
-  500: '#c8102e', // primary
-  600: '#a80d27',
-  700: '#870a1f',
-  800: '#660718',
-  900: '#450410',
+  50: '#eef4fa',
+  100: '#d0e2f1',
+  200: '#a5c6e2',
+  300: '#74a5cf',
+  400: '#4784b7',
+  500: '#2a6796',
+  600: '#174e7a', // primary — 8:1 on white, comfortably AA for body text
+  700: '#103b5d',
+  800: '#0a2942',
+  900: '#051829',
+} as const;
+
+/** The turquoise Eduvos pairs with the navy. Used for accents, never as a ground. */
+const TEAL = {
+  400: '#3fd5c7',
+  500: '#00a99d',
+  600: '#00867d',
+  wash: '#e2f6f4',
 } as const;
 
 const NEUTRAL = {
@@ -64,6 +82,9 @@ export interface ColorScheme {
   primary: string;
   primaryPressed: string;
   primaryTint: string;
+  /** Turquoise. For highlights and emphasis — never a page or button ground. */
+  accent: string;
+  accentTint: string;
 
   info: string;
   infoTint: string;
@@ -92,9 +113,11 @@ export const lightColors: ColorScheme = {
   textFaint: NEUTRAL[400],
   onPrimary: NEUTRAL[0],
 
-  primary: BRAND[500],
-  primaryPressed: BRAND[600],
+  primary: BRAND[600],
+  primaryPressed: BRAND[700],
   primaryTint: BRAND[50],
+  accent: TEAL[500],
+  accentTint: TEAL.wash,
 
   info: SIGNAL.info.light,
   infoTint: '#e8efff',
@@ -121,9 +144,11 @@ export const darkColors: ColorScheme = {
   textFaint: NEUTRAL[500],
   onPrimary: NEUTRAL[0],
 
-  primary: BRAND[400],
-  primaryPressed: BRAND[300],
-  primaryTint: 'rgba(220, 75, 75, 0.16)',
+  primary: BRAND[300],
+  primaryPressed: BRAND[200],
+  primaryTint: 'rgba(116, 165, 207, 0.18)',
+  accent: TEAL[400],
+  accentTint: 'rgba(63, 213, 199, 0.15)',
 
   info: SIGNAL.info.dark,
   infoTint: 'rgba(147, 180, 255, 0.14)',

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, View } from 'react-native';
+import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -121,81 +121,79 @@ export default function NewTicketScreen() {
       scroll
       footer={<Button title="Log ticket" loading={saving} onPress={() => void submit()} />}
     >
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={{ paddingTop: spacing.md, gap: spacing.lg }}>
-          {!online ? (
-            <View
-              style={{
-                flexDirection: 'row',
-                gap: spacing.sm,
-                backgroundColor: colors.warningTint,
-                padding: spacing.md,
-                borderRadius: 10,
-              }}
-            >
-              <Ionicons name="cloud-offline-outline" size={18} color={colors.warning} />
-              <Text variant="caption" style={{ flex: 1, color: colors.warning }}>
-                You are offline. Log it anyway — it saves on your phone and
-                uploads by itself once you have signal.
-              </Text>
-            </View>
-          ) : null}
+      <View style={{ paddingTop: spacing.md, gap: spacing.lg }}>
+        {!online ? (
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: spacing.sm,
+              backgroundColor: colors.warningTint,
+              padding: spacing.md,
+              borderRadius: 10,
+            }}
+          >
+            <Ionicons name="cloud-offline-outline" size={18} color={colors.warning} />
+            <Text variant="caption" style={{ flex: 1, color: colors.warning }}>
+              You are offline. Log it anyway — it saves on your phone and
+              uploads by itself once you have signal.
+            </Text>
+          </View>
+        ) : null}
 
-          <Select
-            label="What is this about?"
-            required
-            value={category}
-            options={CATEGORY_OPTIONS}
-            onChange={setCategory}
-            error={submitted ? categoryError : null}
-          />
+        <Select
+          label="What is this about?"
+          required
+          value={category}
+          options={CATEGORY_OPTIONS}
+          onChange={setCategory}
+          error={submitted ? categoryError : null}
+        />
 
-          <Select
-            label="How urgent is it?"
-            required
-            value={priority}
-            options={PRIORITY_OPTIONS}
-            onChange={setPriority}
-          />
+        <Select
+          label="How urgent is it?"
+          required
+          value={priority}
+          options={PRIORITY_OPTIONS}
+          onChange={setPriority}
+        />
 
-          <TextField
-            label="Title"
-            required
-            value={subject}
-            onChangeText={setSubject}
-            placeholder="Cannot connect to campus Wi-Fi in Lab 3"
-            maxLength={100}
-            error={submitted ? subjectError : null}
-            editable={!saving}
-          />
+        <TextField
+          label="Title"
+          required
+          value={subject}
+          onChangeText={setSubject}
+          placeholder="Cannot connect to campus Wi-Fi in Lab 3"
+          maxLength={100}
+          error={submitted ? subjectError : null}
+          editable={!saving}
+        />
 
-          <TextField
-            label="What happened?"
-            required
-            multiline
-            value={description}
-            onChangeText={setDescription}
-            placeholder="What you were doing, what you expected, and what happened instead. Include any error message."
-            error={submitted ? descriptionError : null}
-            editable={!saving}
-          />
+        <TextField
+          label="What happened?"
+          required
+          multiline
+          value={description}
+          onChangeText={setDescription}
+          placeholder="What you were doing, what you expected, and what happened instead. Include any error message."
+          error={submitted ? descriptionError : null}
+          editable={!saving}
+        />
 
-          <TextField
-            label="Where on campus?"
-            value={location}
-            onChangeText={setLocation}
-            placeholder="Lab 3, Library, Residence block B…"
-            hint="Optional, but it gets someone to you faster."
-            editable={!saving}
-          />
+        <TextField
+          label="Where on campus?"
+          value={location}
+          onChangeText={setLocation}
+          placeholder="Lab 3, Library, Residence block B…"
+          hint="Optional, but it gets someone to you faster."
+          editable={!saving}
+        />
 
-          <Text variant="caption" tone="faint">
-            Logged as {profile?.displayName}
-            {profile?.studentNumber ? ` · ${profile.studentNumber}` : ''}
-            {profile?.campus ? ` · ${profile.campus}` : ''}
-          </Text>
-        </View>
-      </KeyboardAvoidingView>
+        <Text variant="caption" tone="faint">
+          Logged as {profile?.displayName}
+          {profile?.studentNumber ? ` · ${profile.studentNumber}` : ''}
+          {profile?.campus ? ` · ${profile.campus}` : ''}
+        </Text>
+      </View>
     </Screen>
   );
 }

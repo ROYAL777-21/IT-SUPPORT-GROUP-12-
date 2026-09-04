@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import {
@@ -46,82 +46,80 @@ export default function SignInScreen() {
 
   return (
     <Screen scroll>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={{ paddingTop: spacing.xxxl, gap: spacing.xs }}>
-          <Text variant="display">Campus IT Help</Text>
-          <Text tone="muted">
-            Log a support ticket and track it, on or off campus Wi-Fi.
-          </Text>
-        </View>
+      <View style={{ paddingTop: spacing.xxxl, gap: spacing.xs }}>
+        <Text variant="display">Campus IT Help</Text>
+        <Text tone="muted">
+          Log a support ticket and track it, on or off campus Wi-Fi.
+        </Text>
+      </View>
 
-        <View style={{ marginTop: spacing.xxl, gap: spacing.lg }}>
-          <TextField
-            label="Email address"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            autoComplete="email"
-            keyboardType="email-address"
-            textContentType="emailAddress"
-            placeholder="you@eduvos.ac.za"
-            editable={!busy}
-          />
-
-          <TextField
-            label="Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            autoCapitalize="none"
-            autoComplete="current-password"
-            textContentType="password"
-            editable={!busy}
-          />
-
-          {error ? (
-            <Text variant="caption" tone="danger">
-              {error}
-            </Text>
-          ) : null}
-
-          <Button
-            title="Sign in"
-            loading={method === 'password'}
-            disabled={busy}
-            onPress={() => void attempt('password')}
-          />
-
-          <TextLink
-            label="Forgot your password?"
-            align="center"
-            onPress={() => router.push('/(auth)/forgot-password')}
-          />
-        </View>
-
-        <View style={[styles.separator, { marginVertical: spacing.xl, gap: spacing.md }]}>
-          <View style={[styles.rule, { backgroundColor: colors.border }]} />
-          <Text variant="caption" tone="faint">
-            OR
-          </Text>
-          <View style={[styles.rule, { backgroundColor: colors.border }]} />
-        </View>
-
-        <MicrosoftButton
-          loading={method === 'microsoft'}
-          disabled={busy}
-          onPress={() => void attempt('microsoft')}
+      <View style={{ marginTop: spacing.xxl, gap: spacing.lg }}>
+        <TextField
+          label="Email address"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          autoComplete="email"
+          keyboardType="email-address"
+          textContentType="emailAddress"
+          placeholder="you@eduvos.ac.za"
+          editable={!busy}
         />
 
-        <View style={[styles.footer, { marginTop: spacing.xxl, gap: spacing.xs }]}>
-          <Text variant="caption" tone="muted">
-            No account yet?
+        <TextField
+          label="Password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          autoCapitalize="none"
+          autoComplete="current-password"
+          textContentType="password"
+          editable={!busy}
+        />
+
+        {error ? (
+          <Text variant="caption" tone="danger">
+            {error}
           </Text>
-          <TextLink
-            label="Register with your student email"
-            onPress={() => router.push('/(auth)/sign-up')}
-          />
-        </View>
-      </KeyboardAvoidingView>
+        ) : null}
+
+        <Button
+          title="Sign in"
+          loading={method === 'password'}
+          disabled={busy}
+          onPress={() => void attempt('password')}
+        />
+
+        <TextLink
+          label="Forgot your password?"
+          align="center"
+          onPress={() => router.push('/(auth)/forgot-password')}
+        />
+      </View>
+
+      <View style={[styles.separator, { marginVertical: spacing.xl, gap: spacing.md }]}>
+        <View style={[styles.rule, { backgroundColor: colors.border }]} />
+        <Text variant="caption" tone="faint">
+          OR
+        </Text>
+        <View style={[styles.rule, { backgroundColor: colors.border }]} />
+      </View>
+
+      <MicrosoftButton
+        loading={method === 'microsoft'}
+        disabled={busy}
+        onPress={() => void attempt('microsoft')}
+      />
+
+      <View style={[styles.footer, { marginTop: spacing.xxl, gap: spacing.xs }]}>
+        <Text variant="caption" tone="muted">
+          No account yet?
+        </Text>
+        <TextLink
+          label="Register with your student email"
+          onPress={() => router.push('/(auth)/sign-up')}
+        />
+      </View>
     </Screen>
   );
 }

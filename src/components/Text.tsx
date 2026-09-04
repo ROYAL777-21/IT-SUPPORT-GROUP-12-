@@ -6,7 +6,16 @@ import type { TypographyVariant } from '@/theme';
 export interface TextProps extends RNTextProps {
   variant?: TypographyVariant;
   /** Semantic colour role. Defaults to the primary text colour. */
-  tone?: 'default' | 'muted' | 'faint' | 'primary' | 'danger' | 'success' | 'onPrimary';
+  tone?:
+    | 'default'
+    | 'muted'
+    | 'faint'
+    | 'primary'
+    | 'accent'
+    | 'danger'
+    | 'warning'
+    | 'success'
+    | 'onPrimary';
   center?: boolean;
 }
 
@@ -28,7 +37,9 @@ export function Text({
     muted: colors.textMuted,
     faint: colors.textFaint,
     primary: colors.primary,
+    accent: colors.accent,
     danger: colors.danger,
+    warning: colors.warning,
     success: colors.success,
     onPrimary: colors.onPrimary,
   };

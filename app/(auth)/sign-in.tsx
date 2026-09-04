@@ -10,12 +10,13 @@ import {
   TextField,
   TextLink,
 } from '@/components';
+import { isFirebaseConfigured } from '@/config/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/theme';
 
 export default function SignInScreen() {
   const { signIn, signInWithMicrosoft, busy } = useAuth();
-  const { colors, spacing } = useTheme();
+  const { colors, radius, spacing } = useTheme();
   const router = useRouter();
 
   const [email, setEmail] = useState('');
@@ -52,6 +53,34 @@ export default function SignInScreen() {
           Log a support ticket and track it, on or off campus Wi-Fi.
         </Text>
       </View>
+
+      {/*
+        Say it up front rather than after a failed tap. A build without
+        google-services.json cannot sign in at all, and the error you would
+        otherwise get — after typing a password — reads like a wrong password.
+        The APK filename carries the same warning; this is for whoever did not
+        look at it.
+      */}
+      {!isFirebaseConfigured ? (
+        <View
+          style={{
+            marginTop: spacing.xl,
+            padding: spacing.md,
+            gap: spacing.xs,
+            borderRadius: radius.md,
+            backgroundColor: colors.warningTint,
+          }}
+        >
+          <Text variant="bodyStrong" tone="warning">
+            This build cannot sign in
+          </Text>
+          <Text variant="caption" tone="muted">
+            It was built without the Firebase configuration, so there is no
+            account server to talk to. Install a build without “PLACEHOLDER” in
+            its filename — docs/INSTALL.md explains where it comes from.
+          </Text>
+        </View>
+      ) : null}
 
       <View style={{ marginTop: spacing.xxl, gap: spacing.lg }}>
         <TextField

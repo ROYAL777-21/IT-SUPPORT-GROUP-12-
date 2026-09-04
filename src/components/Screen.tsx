@@ -21,6 +21,13 @@ export interface ScreenProps {
    * Which safe-area edges to inset. Android is edge-to-edge unconditionally
    * from SDK 54, so this is not optional decoration — without it content sits
    * under the status and navigation bars.
+   *
+   * The rule for 'bottom', which is the one that catches people: include it on
+   * a screen with a `footer` that lives *outside* the tab navigator, and leave
+   * it off inside one. A tab screen has the tab bar laid out beneath it and the
+   * tab bar carries that inset itself, so adding it again just opens a gap.
+   * A pushed Stack screen has nothing underneath, so without it the footer —
+   * the submit button, usually — ends up behind the gesture bar.
    */
   edges?: readonly Edge[];
   contentContainerStyle?: ViewStyle;

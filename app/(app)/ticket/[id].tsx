@@ -108,7 +108,11 @@ export default function TicketDetailScreen() {
   return (
     <Screen
       padded={false}
-      edges={['left', 'right']}
+      // No 'top' — the Stack header already covers it. 'bottom' because this
+      // screen is outside the tab navigator, so nothing below it absorbs the
+      // navigation-bar inset and the Send button would sit behind the gesture
+      // bar.
+      edges={['left', 'right', 'bottom']}
       footer={
         // No KeyboardAvoidingView here: Screen wraps the footer in one. This
         // composer is the reason that had to move — a footer nested inside the

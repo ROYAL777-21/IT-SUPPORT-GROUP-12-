@@ -63,6 +63,10 @@ export default function OnboardingScreen() {
   return (
     <Screen
       scroll
+      // 'bottom' because this screen is outside the tab navigator: nothing sits
+      // below it to absorb the navigation-bar inset, so without it the Continue
+      // button is behind the gesture bar.
+      edges={['top', 'left', 'right', 'bottom']}
       footer={
         <Button
           title="Continue"

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import {
@@ -10,6 +10,7 @@ import {
   Select,
   Text,
   TextField,
+  useToast,
 } from '@/components';
 import { useAuth } from '@/hooks/useAuth';
 import { useSync } from '@/hooks/useSync';
@@ -28,12 +29,11 @@ const CATEGORY_OPTIONS = TICKET_CATEGORIES.map((category) => ({
   label: CATEGORY_LABELS[category],
 }));
 
-/** Explaining what each level means stops everything arriving marked urgent. */
+/** Explaining what each level means stops everything arriving marked High. */
 const PRIORITY_DESCRIPTIONS: Record<TicketPriority, string> = {
   low: 'Annoying, but you can work around it.',
   medium: 'Slowing you down.',
   high: 'You cannot do coursework until it is fixed.',
-  urgent: 'A test, submission or exam is blocked right now.',
 };
 
 const PRIORITY_OPTIONS = TICKET_PRIORITIES.map((priority) => ({
@@ -46,7 +46,8 @@ export default function NewTicketScreen() {
   const router = useRouter();
   const { user, profile } = useAuth();
   const { notifyLocalWrite, online } = useSync();
-  const { colors, spacing } = useTheme();
+  const { showToast } = useToast();
+  const { colors, radius, spacing } = useTheme();
 
   const [category, setCategory] = useState<TicketCategory | null>(null);
   const [priority, setPriority] = useState<TicketPriority>('medium');
@@ -108,7 +109,10 @@ export default function NewTicketScreen() {
 
       reset();
       notifyLocalWrite();
-      router.push(`/(app)/ticket/${ticket.id}`);
+      showToast('Ticket logged — IT has been notified');
+      // replace, not push: this screen was the way in, and going "back" from
+      // the ticket should land on the list, not on an empty form.
+      router.replace(`/(app)/ticket/${ticket.id}`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not save the ticket.');
     } finally {
@@ -119,8 +123,13 @@ export default function NewTicketScreen() {
   return (
     <Screen
       scroll
-      footer={<Button title="Log ticket" loading={saving} onPress={() => void submit()} />}
+      // Pushed route, not a tab — nothing below it absorbs the navigation-bar
+      // inset, so the footer button needs 'bottom' itself.
+      edges={['left', 'right', 'bottom']}
+      footer={<Button title="Submit Ticket" loading={saving} onPress={() => void submit()} />}
     >
+      <Stack.Screen options={{ title: 'New Ticket' }} />
+
       <View style={{ paddingTop: spacing.md, gap: spacing.lg }}>
         {!online ? (
           <View
@@ -129,7 +138,7 @@ export default function NewTicketScreen() {
               gap: spacing.sm,
               backgroundColor: colors.warningTint,
               padding: spacing.md,
-              borderRadius: 10,
+              borderRadius: radius.sm,
             }}
           >
             <Ionicons name="cloud-offline-outline" size={18} color={colors.warning} />

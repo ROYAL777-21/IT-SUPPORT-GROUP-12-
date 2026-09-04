@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import {
+  BrandMark,
   Button,
   Card,
   Divider,
@@ -13,7 +15,7 @@ import {
 } from '@/components';
 import { useAuth } from '@/hooks/useAuth';
 import { useSync } from '@/hooks/useSync';
-import { initialsOf, type AuthProviderId } from '@/models/user';
+import type { AuthProviderId } from '@/models/user';
 import { providerOf, resendEmailVerification } from '@/services/authService';
 import { useTheme } from '@/theme';
 import { relativeTime } from '@/utils/format';
@@ -25,6 +27,7 @@ const PROVIDER_LABELS: Record<AuthProviderId, string> = {
 };
 
 export default function ProfileScreen() {
+  const router = useRouter();
   const { user, profile, role, signOut } = useAuth();
   const { pending, syncing, online, lastResult, refresh } = useSync();
   const { colors, spacing } = useTheme();
@@ -69,27 +72,20 @@ export default function ProfileScreen() {
   return (
     <Screen scroll>
       <View style={{ paddingTop: spacing.md, gap: spacing.lg }}>
-        <View style={[styles.header, { gap: spacing.md }]}>
-          <View style={[styles.avatar, { backgroundColor: colors.primaryTint }]}>
-            <Text variant="title" style={{ color: colors.primary }}>
-              {initialsOf(profile?.displayName ?? '')}
-            </Text>
-          </View>
-
-          <View style={styles.headerText}>
-            <Text variant="heading">{profile?.displayName ?? 'Your profile'}</Text>
-            <Text variant="caption" tone="muted">
-              {profile?.email ?? user?.email ?? ''}
-            </Text>
-            {role === 'support' ? (
-              <View style={[styles.row, { gap: spacing.xs, marginTop: spacing.xs }]}>
-                <Ionicons name="shield-checkmark" size={14} color={colors.success} />
-                <Text variant="caption" style={{ color: colors.success }}>
-                  IT Support
-                </Text>
-              </View>
-            ) : null}
-          </View>
+        <View style={[styles.header, { gap: spacing.sm }]}>
+          <BrandMark size={80} />
+          <Text variant="heading">{profile?.displayName ?? 'Your profile'}</Text>
+          <Text variant="caption" tone="muted">
+            {profile?.email ?? user?.email ?? ''}
+          </Text>
+          {role === 'support' ? (
+            <View style={[styles.row, { gap: spacing.xs }]}>
+              <Ionicons name="shield-checkmark" size={14} color={colors.success} />
+              <Text variant="caption" style={{ color: colors.success }}>
+                IT Support
+              </Text>
+            </View>
+          ) : null}
         </View>
 
         <SyncBanner
@@ -165,7 +161,53 @@ export default function ProfileScreen() {
           />
         </Card>
 
-        <Button title="Sign out" variant="secondary" onPress={confirmSignOut} />
+        <Card flush>
+          <ListItem
+            title="Account Settings"
+            leading={<Ionicons name="settings-outline" size={20} color={colors.textMuted} />}
+            onPress={() => router.push('/(app)/account-settings')}
+          />
+          <Divider inset={spacing.lg} />
+          <ListItem
+            title="Notifications"
+            leading={
+              <Ionicons name="notifications-outline" size={20} color={colors.textMuted} />
+            }
+            onPress={() => router.push('/(app)/notifications')}
+          />
+          {role === 'support' ? null : (
+            <>
+              <Divider inset={spacing.lg} />
+              <ListItem
+                title="Help & Support"
+                leading={<Ionicons name="bookmark-outline" size={20} color={colors.textMuted} />}
+                onPress={() => router.push('/(app)/(tabs)/help')}
+              />
+            </>
+          )}
+          <Divider inset={spacing.lg} />
+          {/*
+            The design sets Log Out in the sky-blue accent rather than a red.
+            Signing out is not destructive here — the tickets are on the server —
+            so a danger colour would overstate it.
+          */}
+          <Pressable
+            accessibilityRole="button"
+            onPress={confirmSignOut}
+            style={({ pressed }) => [
+              styles.signOut,
+              {
+                paddingHorizontal: spacing.lg,
+                paddingVertical: spacing.lg,
+                backgroundColor: pressed ? colors.surfaceAlt : 'transparent',
+              },
+            ]}
+          >
+            <Text variant="bodyStrong" style={{ color: colors.accent }}>
+              Log Out
+            </Text>
+          </Pressable>
+        </Card>
 
         <Text variant="caption" tone="faint" center>
           Campus IT Help · Group 12
@@ -177,8 +219,7 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center' },
-  headerText: { flex: 1 },
+  header: { alignItems: 'center' },
   row: { flexDirection: 'row', alignItems: 'center' },
-  avatar: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
+  signOut: { alignItems: 'flex-start' },
 });

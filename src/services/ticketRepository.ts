@@ -354,3 +354,54 @@ export async function upsertPulledComment(comment: TicketComment): Promise<void>
     ],
   );
 }
+
+/**
+ * Recent support replies across a student's tickets, newest first.
+ *
+ * This is what the Notifications screen shows. It is a join over rows already
+ * in SQLite rather than a new collection: a support reply is exactly a comment
+ * with `from_support = 1`, so there is nothing extra to sync and it works with
+ * no connection like everything else.
+ */
+export interface ActivityItem {
+  id: string;
+  ticketId: string;
+  ticketSubject: string;
+  authorName: string;
+  body: string;
+  createdAt: number;
+}
+
+interface ActivityRow {
+  id: string;
+  ticket_id: string;
+  subject: string;
+  author_name: string;
+  body: string;
+  created_at: number;
+}
+
+export async function listSupportActivity(
+  userId: string,
+  limit = 40,
+): Promise<ActivityItem[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<ActivityRow>(
+    `SELECT c.id, c.ticket_id, t.subject, c.author_name, c.body, c.created_at
+       FROM ticket_comments c
+       JOIN tickets t ON t.id = c.ticket_id
+      WHERE c.from_support = 1 AND t.created_by = ?
+      ORDER BY c.created_at DESC
+      LIMIT ?;`,
+    [userId, limit],
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    ticketId: row.ticket_id,
+    ticketSubject: row.subject,
+    authorName: row.author_name,
+    body: row.body,
+    createdAt: row.created_at,
+  }));
+}

@@ -72,6 +72,11 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # The taxonomy migration rewrites rows rather than the schema, so a break
+      # there throws nothing — a ticket just renders blank. Needs no emulator.
+      - name: Migration tests
+        run: npm run test:migrations
+
 
       - name: Write google-services.json
         id: firebase

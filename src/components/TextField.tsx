@@ -66,7 +66,7 @@ export function TextField({
           {
             backgroundColor: colors.surface,
             borderColor,
-            borderRadius: radius.md,
+            borderRadius: radius.sm,
             color: colors.text,
             paddingHorizontal: spacing.md,
             paddingVertical: spacing.md,

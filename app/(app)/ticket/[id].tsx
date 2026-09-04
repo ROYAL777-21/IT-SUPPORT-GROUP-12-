@@ -1,17 +1,20 @@
 import { useState } from 'react';
-import { FlatList, StyleSheet, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import {
   Button,
   Card,
-  PriorityDot,
+  ChatBubble,
+  PriorityTag,
   Screen,
-  Select,
-  StatusBadge,
+  SegmentedControl,
+  StatusTag,
+  Tag,
   Text,
   TextField,
+  useToast,
 } from '@/components';
 import { useAuth } from '@/hooks/useAuth';
 import { useSync } from '@/hooks/useSync';
@@ -19,11 +22,9 @@ import { useComments, useTicket } from '@/hooks/useTickets';
 import {
   CATEGORY_LABELS,
   STATUS_LABELS,
+  TICKET_STATUSES,
   allowedTransitions,
-  type TicketComment,
-  type TicketStatus,
 } from '@/models/ticket';
-import { initialsOf } from '@/models/user';
 import {
   addComment,
   assignTicket,
@@ -32,11 +33,17 @@ import {
 import { useTheme } from '@/theme';
 import { fullTimestamp, relativeTime } from '@/utils/format';
 
+const STATUS_SEGMENTS = TICKET_STATUSES.map((status) => ({
+  value: status,
+  label: STATUS_LABELS[status],
+}));
+
 export default function TicketDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user, profile, role } = useAuth();
   const { notifyLocalWrite } = useSync();
-  const { colors, spacing } = useTheme();
+  const { showToast } = useToast();
+  const { colors, radius, spacing } = useTheme();
 
   const { data: ticket, loading } = useTicket(id);
   const { data: comments } = useComments(id);
@@ -71,12 +78,13 @@ export default function TicketDetailScreen() {
 
   const transitions = allowedTransitions(ticket.status, isSupport ? 'support' : 'student');
 
-  async function act<T>(action: () => Promise<T>) {
+  async function act<T>(action: () => Promise<T>, confirmation?: string) {
     setError(null);
     setWorking(true);
     try {
       await action();
       notifyLocalWrite();
+      if (confirmation) showToast(confirmation);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'That did not work.');
     } finally {
@@ -98,6 +106,7 @@ export default function TicketDetailScreen() {
       });
       setReply('');
       notifyLocalWrite();
+      showToast('Message sent');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not post your message.');
     } finally {
@@ -114,30 +123,39 @@ export default function TicketDetailScreen() {
       // bar.
       edges={['left', 'right', 'bottom']}
       footer={
-        // No KeyboardAvoidingView here: Screen wraps the footer in one. This
-        // composer is the reason that had to move — a footer nested inside the
-        // old per-screen KAV sat *below* it, so on Android the keyboard covered
-        // the reply box and the Send button outright.
-        <View style={{ gap: spacing.sm }}>
-          <TextField
-            label={isSupport ? 'Reply to the student' : 'Add a message'}
-            value={reply}
-            onChangeText={setReply}
-            multiline
-            placeholder={
-              isSupport
-                ? 'What you found, what you did, or what you need from them.'
-                : 'Anything else that might help support.'
-            }
-            editable={!posting}
-            containerStyle={styles.replyField}
-          />
-          <Button
-            title="Send"
-            loading={posting}
-            disabled={!reply.trim()}
+        // No KeyboardAvoidingView here: Screen wraps the footer in one.
+        // The design puts the composer on one line with a send icon beside it,
+        // which is what makes a ticket read as a conversation rather than a
+        // form you submit to.
+        <View style={[styles.composer, { gap: spacing.sm }]}>
+          <View style={styles.grow}>
+            <TextField
+              label={isSupport ? 'Reply to the student' : 'Add a message'}
+              value={reply}
+              onChangeText={setReply}
+              multiline
+              placeholder="Type a message"
+              editable={!posting}
+              containerStyle={styles.replyField}
+            />
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Send message"
+            accessibilityState={{ disabled: !reply.trim() || posting }}
+            disabled={!reply.trim() || posting}
             onPress={() => void postReply()}
-          />
+            style={({ pressed }) => [
+              styles.send,
+              {
+                backgroundColor: pressed ? colors.primaryPressed : colors.primary,
+                borderRadius: radius.button,
+                opacity: !reply.trim() || posting ? 0.5 : 1,
+              },
+            ]}
+          >
+            <Ionicons name="send" size={17} color={colors.onPrimary} />
+          </Pressable>
         </View>
       }
     >
@@ -147,7 +165,7 @@ export default function TicketDetailScreen() {
         data={comments}
         keyExtractor={(comment) => comment.id}
         // With the reply keyboard up, a tap first dismisses it and is otherwise
-        // swallowed — "handled" lets the assign/status buttons in the header
+        // swallowed — "handled" lets the assign/status controls in the header
         // fire on that same first tap instead of needing a second one.
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
@@ -160,86 +178,80 @@ export default function TicketDetailScreen() {
           <View style={{ gap: spacing.md, paddingTop: spacing.md }}>
             <Card>
               <View style={{ gap: spacing.sm }}>
-                <View style={[styles.row, { gap: spacing.sm }]}>
-                  <StatusBadge status={ticket.status} />
-                  <View style={styles.spacer} />
-                  <PriorityDot priority={ticket.priority} showLabel />
+                <Text variant="subheading">{ticket.subject}</Text>
+
+                <View style={[styles.tagRow, { gap: spacing.xs }]}>
+                  <Tag label={CATEGORY_LABELS[ticket.category]} />
+                  <PriorityTag priority={ticket.priority} />
+                  <StatusTag status={ticket.status} />
                 </View>
 
-                <Text variant="heading">{ticket.subject}</Text>
-                <Text>{ticket.description}</Text>
+                <Text tone="muted">{ticket.description}</Text>
 
                 <View style={{ gap: spacing.xs, marginTop: spacing.sm }}>
-                  <Detail label="Category" value={CATEGORY_LABELS[ticket.category]} />
                   {ticket.location ? <Detail label="Where" value={ticket.location} /> : null}
                   <Detail label="Campus" value={ticket.campus || '—'} />
                   {isSupport ? (
                     <Detail label="Student number" value={ticket.studentNumber || '—'} />
                   ) : null}
                   <Detail label="Logged" value={fullTimestamp(ticket.createdAt)} />
-                  <Detail
-                    label="Assigned to"
-                    value={ticket.assignedToName ?? 'Nobody yet'}
-                  />
+                  <Detail label="Assigned to" value={ticket.assignedToName ?? 'Nobody yet'} />
                 </View>
               </View>
             </Card>
 
             {isSupport && user && profile ? (
-              <Card>
-                <View style={{ gap: spacing.md }}>
-                  <Text variant="overline" tone="muted">
-                    SUPPORT ACTIONS
-                  </Text>
+              <View style={{ gap: spacing.md }}>
+                {/*
+                  The design sets status with a segmented control rather than a
+                  picker — three states, always visible, one tap to change. The
+                  assign button is ours: the design has no queue to assign from,
+                  but a shared queue is unworkable without it.
+                */}
+                <SegmentedControl
+                  label="Set ticket status"
+                  options={STATUS_SEGMENTS}
+                  value={ticket.status}
+                  disabled={working}
+                  onChange={(status) =>
+                    void act(
+                      () => updateTicketStatus(ticket.id, status),
+                      `Status set to ${STATUS_LABELS[status]}`,
+                    )
+                  }
+                />
 
-                  <Button
-                    title={mine ? 'Hand this back' : 'Assign to me'}
-                    variant="secondary"
-                    loading={working}
-                    onPress={() =>
-                      void act(() =>
+                <Button
+                  title={mine ? 'Hand this back' : 'Assign to me'}
+                  variant="secondary"
+                  loading={working}
+                  onPress={() =>
+                    void act(
+                      () =>
                         assignTicket(
                           ticket.id,
                           mine ? null : { id: user.uid, name: profile.displayName },
                         ),
-                      )
-                    }
-                  />
-
-                  <Select
-                    label="Change status"
-                    value={ticket.status}
-                    options={transitions.map((status) => ({
-                      value: status,
-                      label: STATUS_LABELS[status],
-                    }))}
-                    onChange={(status) =>
-                      void act(() => updateTicketStatus(ticket.id, status as TicketStatus))
-                    }
-                  />
-                </View>
-              </Card>
+                      mine ? 'Handed back to the queue' : 'Assigned to you',
+                    )
+                  }
+                />
+              </View>
             ) : transitions.length > 0 ? (
               <Card>
                 <View style={{ gap: spacing.md }}>
-                  <Text variant="bodyStrong">
-                    {ticket.status === 'resolved'
-                      ? 'Did that fix it?'
-                      : 'Is this happening again?'}
-                  </Text>
-                  <View style={[styles.row, { gap: spacing.sm }]}>
-                    {transitions.map((status) => (
-                      <Button
-                        key={status}
-                        title={status === 'closed' ? 'Yes, close it' : 'No, reopen'}
-                        variant={status === 'closed' ? 'primary' : 'secondary'}
-                        fullWidth={false}
-                        loading={working}
-                        style={styles.flexButton}
-                        onPress={() => void act(() => updateTicketStatus(ticket.id, status))}
-                      />
-                    ))}
-                  </View>
+                  <Text variant="bodyStrong">Is this still happening?</Text>
+                  <Button
+                    title="Reopen this ticket"
+                    variant="secondary"
+                    loading={working}
+                    onPress={() =>
+                      void act(
+                        () => updateTicketStatus(ticket.id, 'open'),
+                        'Ticket reopened',
+                      )
+                    }
+                  />
                 </View>
               </Card>
             ) : null}
@@ -261,17 +273,30 @@ export default function TicketDetailScreen() {
             {isSupport ? '' : ' Support will reply here.'}
           </Text>
         }
-        renderItem={({ item }) => <CommentBubble comment={item} isMine={item.authorId === user?.uid} />}
+        renderItem={({ item }) => (
+          <ChatBubble
+            body={item.body}
+            author={
+              item.authorId === user?.uid
+                ? 'You'
+                : item.fromSupport
+                  ? `${item.authorName} · IT Support`
+                  : item.authorName
+            }
+            timestamp={relativeTime(item.createdAt)}
+            mine={item.authorId === user?.uid}
+          />
+        )}
       />
     </Screen>
   );
 }
 
 /**
- * Both of these live at module scope on purpose. A component defined inside
- * another component is a *new* component type on every render, so React
- * unmounts and remounts the whole subtree each time the parent updates —
- * which for a comment list means losing scroll position on every sync tick.
+ * At module scope on purpose. A component defined inside another component is a
+ * *new* component type on every render, so React unmounts and remounts the
+ * whole subtree each time the parent updates — which for a comment list means
+ * losing scroll position on every sync tick.
  */
 function Detail({ label, value }: { label: string; value: string }) {
   const { spacing } = useTheme();
@@ -281,74 +306,19 @@ function Detail({ label, value }: { label: string; value: string }) {
       <Text variant="caption" tone="muted" style={styles.detailLabel}>
         {label}
       </Text>
-      <Text variant="caption" style={styles.spacer}>
+      <Text variant="caption" style={styles.grow}>
         {value}
       </Text>
     </View>
   );
 }
 
-function CommentBubble({
-  comment,
-  isMine,
-}: {
-  comment: TicketComment;
-  isMine: boolean;
-}) {
-  const { colors, spacing } = useTheme();
-
-  return (
-    <View style={[styles.row, styles.bubbleRow, { gap: spacing.sm }]}>
-      <View
-        style={[
-          styles.avatar,
-          { backgroundColor: comment.fromSupport ? colors.primaryTint : colors.surfaceAlt },
-        ]}
-      >
-        <Text
-          variant="caption"
-          style={{ color: comment.fromSupport ? colors.primary : colors.textMuted }}
-        >
-          {initialsOf(comment.authorName)}
-        </Text>
-      </View>
-
-      <View
-        style={[
-          styles.spacer,
-          styles.bubble,
-          {
-            backgroundColor: comment.fromSupport ? colors.primaryTint : colors.surface,
-            borderColor: colors.border,
-            borderRadius: 12,
-            padding: spacing.md,
-            gap: spacing.xs,
-          },
-        ]}
-      >
-        <View style={[styles.row, { gap: spacing.sm }]}>
-          <Text variant="caption" tone={comment.fromSupport ? 'primary' : 'muted'}>
-            {isMine ? 'You' : comment.authorName}
-            {comment.fromSupport ? ' · IT Support' : ''}
-          </Text>
-          <View style={styles.spacer} />
-          <Text variant="caption" tone="faint">
-            {relativeTime(comment.createdAt)}
-          </Text>
-        </View>
-        <Text>{comment.body}</Text>
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
-  bubbleRow: { alignItems: 'flex-start' },
-  spacer: { flex: 1 },
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap' },
+  grow: { flex: 1 },
   detailLabel: { width: 110 },
-  flexButton: { flex: 1 },
   replyField: { flex: 0 },
-  avatar: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  bubble: { borderWidth: StyleSheet.hairlineWidth },
+  composer: { flexDirection: 'row', alignItems: 'flex-end' },
+  send: { width: 46, height: 46, alignItems: 'center', justifyContent: 'center' },
 });

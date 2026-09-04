@@ -35,6 +35,14 @@ export default function AppLayout() {
           name="ticket/[id]"
           options={{ title: 'Ticket', headerBackTitle: 'Back' }}
         />
+        {/*
+         * Pushed rather than tabs. The design keeps the tab bar to four slots
+         * and reaches these from a button or a row, which is what lets Help
+         * have a tab at all.
+         */}
+        <Stack.Screen name="new-ticket" options={{ title: 'New Ticket' }} />
+        <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
+        <Stack.Screen name="account-settings" options={{ title: 'Account Settings' }} />
       </Stack.Protected>
     </Stack>
   );

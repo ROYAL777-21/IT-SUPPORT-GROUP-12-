@@ -1,20 +1,17 @@
 /**
  * Domain model for the Campus IT Help ticketing app.
  *
- * The category list is drawn from the project brief. `support.js` from the
- * design mockups was meant to be the source of truth for it, but those files
- * were never added to the repo — if they arrive, reconcile against them here
- * and nowhere else.
+ * The category, priority and status lists are the ones in the Campus IT Help
+ * design (`Campus IT Help.dc.html`). This file is the single source for all
+ * three: screens, the queue ordering and `firestore.rules` all follow from
+ * here, so reconcile against the design here and nowhere else.
  */
 
 export const TICKET_CATEGORIES = [
   'wifi',
-  'account',
+  'portal',
   'hardware',
   'software',
-  'email',
-  'lms',
-  'printing',
   'other',
 ] as const;
 
@@ -22,37 +19,26 @@ export type TicketCategory = (typeof TICKET_CATEGORIES)[number];
 
 export const CATEGORY_LABELS: Record<TicketCategory, string> = {
   wifi: 'Wi-Fi & Network',
-  account: 'Login & Password',
-  hardware: 'Hardware & Lab PCs',
-  software: 'Software & Licences',
-  email: 'Student Email',
-  lms: 'Learning Portal',
-  printing: 'Printing & Copy Credits',
-  other: 'Something Else',
+  portal: 'Student Portal',
+  hardware: 'Hardware & Labs',
+  software: 'Software & Licensing',
+  other: 'Other',
 };
 
-export const TICKET_PRIORITIES = ['low', 'medium', 'high', 'urgent'] as const;
+export const TICKET_PRIORITIES = ['low', 'medium', 'high'] as const;
 export type TicketPriority = (typeof TICKET_PRIORITIES)[number];
 
-export const TICKET_STATUSES = [
-  'open',
-  'in_progress',
-  'awaiting_student',
-  'resolved',
-  'closed',
-] as const;
+export const TICKET_STATUSES = ['open', 'in_progress', 'resolved'] as const;
 export type TicketStatus = (typeof TICKET_STATUSES)[number];
 
 export const STATUS_LABELS: Record<TicketStatus, string> = {
   open: 'Open',
   in_progress: 'In Progress',
-  awaiting_student: 'Awaiting Your Reply',
   resolved: 'Resolved',
-  closed: 'Closed',
 };
 
 /** A status the student can no longer add to without reopening. */
-export const CLOSED_STATUSES: readonly TicketStatus[] = ['resolved', 'closed'];
+export const CLOSED_STATUSES: readonly TicketStatus[] = ['resolved'];
 
 export function isClosed(status: TicketStatus): boolean {
   return CLOSED_STATUSES.includes(status);
@@ -61,10 +47,9 @@ export function isClosed(status: TicketStatus): boolean {
 /**
  * Which statuses each role may move a ticket to.
  *
- * Support drives the lifecycle. A student can only do two things: confirm a
- * fix (resolved -> closed) or say it is still broken (reopen to open). Letting
- * them set 'in_progress' would be meaningless — they are not the ones working
- * it.
+ * Support drives the lifecycle. A student can only reopen a ticket they were
+ * told was fixed. Letting them set 'in_progress' would be meaningless — they
+ * are not the ones working it.
  */
 export function allowedTransitions(
   from: TicketStatus,
@@ -73,10 +58,8 @@ export function allowedTransitions(
   if (role === 'support') {
     return TICKET_STATUSES.filter((status) => status !== from);
   }
+  // A student's only lever is to say it is still broken.
   if (from === 'resolved') {
-    return ['closed', 'open'];
-  }
-  if (from === 'closed') {
     return ['open'];
   }
   return [];

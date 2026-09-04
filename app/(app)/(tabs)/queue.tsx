@@ -45,9 +45,10 @@ export default function QueueScreen() {
       case 'unassigned':
         return { unassignedOnly: true };
       case 'open':
-        return {
-          statuses: ['open', 'in_progress', 'awaiting_student'] as TicketStatus[],
-        };
+        // Everything not yet finished. Spelled out rather than cast so that
+        // retiring a status is a type error here, not a filter that silently
+        // matches nothing.
+        return { statuses: ['open', 'in_progress'] satisfies TicketStatus[] };
       default:
         return {};
     }

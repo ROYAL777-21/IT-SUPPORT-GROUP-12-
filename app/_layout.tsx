@@ -5,6 +5,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { ToastProvider } from '@/components';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { SyncProvider } from '@/hooks/useSync';
 import { ThemeProvider, useTheme } from '@/theme';
@@ -18,7 +19,15 @@ export default function RootLayout() {
         <ThemeProvider>
           <AuthProvider>
             <SyncProvider>
-              <RootNavigator />
+              {/*
+                Inside SafeAreaProvider because the toast positions itself off
+                the bottom inset, and outside the navigator so it survives a
+                route change — a confirmation for an action that navigates
+                away is exactly the case it exists for.
+              */}
+              <ToastProvider>
+                <RootNavigator />
+              </ToastProvider>
             </SyncProvider>
           </AuthProvider>
         </ThemeProvider>

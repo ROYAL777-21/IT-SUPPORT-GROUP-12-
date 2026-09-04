@@ -1,14 +1,17 @@
 import {
+  EmailAuthProvider,
   OAuthProvider,
   createUserWithEmailAndPassword,
   deleteUser,
   getIdTokenResult,
   onAuthStateChanged,
+  reauthenticateWithCredential,
   sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
+  updatePassword as updateFirebasePassword,
   updateProfile,
   type AuthProvider,
   type User,
@@ -307,4 +310,49 @@ export function providerOf(user: User): AuthProviderId {
     return 'password';
   }
   return 'unknown';
+}
+
+
+/**
+ * Changes the signed-in user's password.
+ *
+ * Firebase requires a recent sign-in before it will accept this, and a session
+ * restored from disk on app launch is never recent. So reauthenticate with the
+ * current password first — which doubles as the check that the person holding
+ * the phone is the account owner, not someone who picked up an unlocked device.
+ *
+ * Only meaningful for password accounts. A Microsoft account has no password
+ * here to change; it lives in Entra ID.
+ */
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  requireConfigured();
+
+  const user = getFirebaseAuth().currentUser;
+  if (!user?.email) {
+    throw new AuthError('You are not signed in.');
+  }
+  if (providerOf(user) !== 'password') {
+    throw new AuthError(
+      'This account signs in with Microsoft, so its password is managed by Eduvos rather than here.',
+    );
+  }
+  if (newPassword.length < 8) {
+    throw new AuthError('Your new password needs to be at least 8 characters.');
+  }
+
+  try {
+    const credential = EmailAuthProvider.credential(user.email, currentPassword);
+    await reauthenticateWithCredential(user, credential);
+  } catch (cause) {
+    throw toAuthError(cause, 'That current password is not right.');
+  }
+
+  try {
+    await updateFirebasePassword(user, newPassword);
+  } catch (cause) {
+    throw toAuthError(cause, 'Could not change your password.');
+  }
 }

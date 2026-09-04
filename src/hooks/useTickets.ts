@@ -5,7 +5,9 @@ import {
   getTicket,
   listComments,
   listQueue,
+  listSupportActivity,
   listTicketsFor,
+  type ActivityItem,
   type QueueFilter,
 } from '@/services/ticketRepository';
 
@@ -101,5 +103,21 @@ export function useComments(ticketId: string | undefined): Query<TicketComment[]
     async () => (ticketId ? listComments(ticketId) : []),
     [],
     [ticketId, revision],
+  );
+}
+
+/**
+ * Support replies across all of the student's tickets — what Notifications
+ * lists. Reads SQLite like everything else, so it works offline and updates
+ * when sync brings new comments in.
+ */
+export function useSupportActivity(): Query<ActivityItem[]> {
+  const { user } = useAuth();
+  const { revision } = useSync();
+
+  return useLocalQuery<ActivityItem[]>(
+    async () => (user ? listSupportActivity(user.uid) : []),
+    [],
+    [user?.uid, revision],
   );
 }

@@ -75,7 +75,7 @@ export function Button({
         {
           backgroundColor: pressed ? pressedBg : bg,
           borderColor: border,
-          borderRadius: radius.md,
+          borderRadius: radius.button,
           paddingHorizontal: spacing.lg,
           gap: spacing.sm,
           opacity: isDisabled ? 0.5 : 1,

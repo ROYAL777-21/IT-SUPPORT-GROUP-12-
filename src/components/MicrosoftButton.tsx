@@ -43,7 +43,7 @@ export function MicrosoftButton({ onPress, loading = false, disabled }: Microsof
         {
           backgroundColor: pressed ? colors.surfaceAlt : colors.surface,
           borderColor: colors.borderStrong,
-          borderRadius: radius.md,
+          borderRadius: radius.button,
           paddingHorizontal: spacing.lg,
           gap: spacing.md,
           opacity: isDisabled ? 0.5 : 1,

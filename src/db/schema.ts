@@ -104,6 +104,49 @@ export const MIGRATIONS: Migration[] = [
          ON ticket_comments (sync_state);`,
     ],
   },
+
+  {
+    /*
+     * Fold the taxonomy onto the one in the Campus IT Help design, which
+     * arrived after v2 and is shorter than what was guessed in its absence:
+     * five categories, three priorities, three statuses.
+     *
+     * These columns are plain TEXT with no CHECK constraint, so nothing here
+     * alters the schema — it rewrites rows. Without it, a ticket logged before
+     * today keeps a value the app no longer has a label for and renders blank,
+     * which looks like data loss and is worse than the value being wrong.
+     *
+     * Rows are not marked sync_state='pending'. This is a local relabelling to
+     * match the UI, not a user edit, and flagging every historical row would
+     * push the whole cache back to Firestore on next launch.
+     */
+    version: 3,
+    statements: [
+      /* 'urgent' folds into the highest level that survives. */
+      `UPDATE tickets SET priority = 'high' WHERE priority = 'urgent';`,
+
+      /*
+       * 'awaiting_student' meant "support is waiting on the reporter" — still
+       * live work, so in_progress. 'closed' was the terminal state after
+       * 'resolved' and is now indistinguishable from it.
+       */
+      `UPDATE tickets SET status = 'in_progress' WHERE status = 'awaiting_student';`,
+      `UPDATE tickets SET status = 'resolved' WHERE status = 'closed';`,
+
+      /*
+       * Login, student email and the learning portal were three separate
+       * categories; the design has one Student Portal covering all of them.
+       * Printing is a lab-equipment problem, so it joins Hardware & Labs.
+       */
+      `UPDATE tickets SET category = 'portal'
+         WHERE category IN ('account', 'email', 'lms');`,
+      `UPDATE tickets SET category = 'hardware' WHERE category = 'printing';`,
+
+      /* Anything else unrecognised lands in Other rather than rendering blank. */
+      `UPDATE tickets SET category = 'other'
+         WHERE category NOT IN ('wifi', 'portal', 'hardware', 'software', 'other');`,
+    ],
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

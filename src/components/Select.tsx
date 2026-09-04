@@ -61,7 +61,7 @@ export function Select<T extends string>({
           {
             backgroundColor: pressed ? colors.surfaceAlt : colors.surface,
             borderColor: error ? colors.danger : colors.border,
-            borderRadius: radius.md,
+            borderRadius: radius.sm,
             paddingHorizontal: spacing.md,
           },
         ]}

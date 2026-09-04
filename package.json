@@ -10,7 +10,8 @@
     "grant-support": "node scripts/grant-support.mjs",
     "start": "expo start --dev-client",
     "test:rules": "npx --yes firebase-tools emulators:exec --only firestore --project campus-it-help-rules-test \"node --test tests/firestore-rules.test.mjs\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:migrations": "node --test tests/migration-v3.test.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",

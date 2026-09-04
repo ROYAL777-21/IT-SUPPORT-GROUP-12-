@@ -170,6 +170,14 @@ to the Play Store with.
 and `EXPO_PUBLIC_AZURE_TENANT_ID`, both covered in
 [`docs/INSTALL.md`](docs/INSTALL.md).
 
+### Running it on the Android Studio emulator instead
+
+Works, but it needs the right virtual device or it is unusably slow and the
+keyboard does nothing. Both are configuration, and both are fixed in
+[`docs/EMULATOR.md`](docs/EMULATOR.md). The three that matter: an **x86_64**
+system image labelled **Google Play**, hardware acceleration confirmed with
+`emulator -accel-check`, and **Enable keyboard input** ticked on the device.
+
 ## Deployment (EAS)
 
 Profiles are defined in `eas.json`.
@@ -264,6 +272,7 @@ docs/
   ARCHITECTURE.md             How offline-first sync works
   AUTH.md                     Both sign-in paths, and why the JS SDK could not do Microsoft
   INSTALL.md                  Getting the app onto a phone — start here
+  EMULATOR.md                 Android Studio emulator: the slow-and-can't-type fixes
 ```
 
 ## About the design
@@ -274,6 +283,12 @@ added to this repo, so the UI is built from a design system defined in
 or type size is written down — every component reads from it. If the mockups
 turn up, porting them means rewriting that one file rather than hunting hex
 codes through the screens.
+
+The palette is Eduvos navy with a turquoise accent, in light and dark. The
+hexes are matched by eye rather than taken from the brand guide, because
+`ds-styles.css` — which holds the real ones — is one of the files still
+missing. Swapping them in is a one-file change, which is the whole point of
+keeping colour in one place.
 
 ## How the offline-first part works
 

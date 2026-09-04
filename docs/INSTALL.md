@@ -145,6 +145,10 @@ The redirect URI in Azure has to be *exactly*
 **The dev client says "no development servers found".**
 Section B, "If the phone cannot find your laptop" — try `--tunnel`.
 
+**The Android Studio emulator is crawling, or typing does nothing.**
+Neither is the app. Both are virtual-device settings — hardware acceleration
+and **Enable keyboard input**. [`EMULATOR.md`](EMULATOR.md) has the whole list.
+
 **Tickets appear but never sync.**
 Expected with no signal: they are saved on the phone and upload when a
 connection returns. The banner at the top of the ticket list shows how many are

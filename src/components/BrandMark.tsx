@@ -1,22 +1,22 @@
-import { StyleSheet, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
 
 import { useTheme } from '@/theme';
-
-import { Text } from './Text';
 
 /**
  * The Eduvos mark.
  *
- * Every place the logo appears goes through here, so when `assets/eduvos-logo.jpg`
- * lands it is one import rather than a hunt through screens.
+ * Every place the logo appears goes through here, so swapping the asset is one
+ * file rather than a hunt through screens.
  *
- * Until then this renders the navy tile the design puts the logo on, with the
- * wordmark set in type. That is a deliberate stand-in rather than a redrawn
- * crest: an approximated logo looks finished and is wrong, which is worse than
- * one that plainly is not the mark yet.
+ * The tile is light in both themes rather than following `colors.surface`. The
+ * mark is navy, so on a dark surface it would all but disappear — a light plate
+ * behind a dark logo is the usual answer and is what the brand's own material
+ * does. The design draws this tile in navy, but it was drawn that way as an
+ * empty container before there was a logo to put in it; filling it with a navy
+ * crest would render the crest invisible.
  */
 export function BrandMark({ size = 88 }: { size?: number }) {
-  const { colors, radius } = useTheme();
+  const { radius } = useTheme();
 
   return (
     <View
@@ -24,24 +24,25 @@ export function BrandMark({ size = 88 }: { size?: number }) {
       accessibilityLabel="Eduvos"
       style={[
         styles.tile,
-        {
-          width: size,
-          height: size,
-          backgroundColor: colors.primaryPressed,
-          borderRadius: radius.md,
-        },
+        { width: size, height: size, borderRadius: radius.md },
       ]}
     >
-      <Text
-        variant="bodyStrong"
-        style={{ color: '#ffffff', fontSize: size * 0.2, letterSpacing: 0.5 }}
-      >
-        Eduvos
-      </Text>
+      <Image
+        source={require('../../assets/eduvos-logo.png')}
+        style={{ width: size * 0.68, height: size * 0.82 }}
+        resizeMode="contain"
+        accessible={false}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  tile: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  tile: {
+    // The design's --color-bg. Fixed rather than themed, for the reason above.
+    backgroundColor: '#F5F7F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
 });

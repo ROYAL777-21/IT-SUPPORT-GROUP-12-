@@ -284,11 +284,39 @@ or type size is written down — every component reads from it. If the mockups
 turn up, porting them means rewriting that one file rather than hunting hex
 codes through the screens.
 
-The palette is Eduvos navy with a turquoise accent, in light and dark. The
-hexes are matched by eye rather than taken from the brand guide, because
-`ds-styles.css` — which holds the real ones — is one of the files still
-missing. Swapping them in is a one-file change, which is the whole point of
-keeping colour in one place.
+The palette is Eduvos navy (`#15305F`) with the logo's sky-blue accent
+(`#2AA2E1`), in light and dark. Those are exact — taken from the design's own
+`:root`. Two things in `tokens.ts` are still approximations, and it says so: the
+neutral grey ramp and the type family, because `ds-styles.css` did not come with
+the export.
+
+## Brand assets
+
+`assets/` is generated from the supplied logo by
+`scripts/build-brand-assets.py`, which finds the artwork by scanning for
+non-background pixels rather than using hard-coded crops, so a better source
+file regenerates everything consistently:
+
+```bash
+pip3 install Pillow
+python3 scripts/build-brand-assets.py path/to/Eduvos_Logo.pdf
+```
+
+| Asset | What it is |
+| --- | --- |
+| `eduvos-logo.png` | Full lockup, background keyed out. Used by `BrandMark`. |
+| `icon.png` | Launcher icon — the crest only. The lockup's tagline is illegible at 48dp. |
+| `adaptive-icon.png` | Android adaptive foreground, drawn smaller to survive the mask. |
+| `splash-icon.png` | The full lockup, which has room to be read. |
+
+**The launcher icon is soft, and that is a source limitation rather than a bug.**
+The logo we have is a 474×325 scan in which the crest occupies **48×80 real
+pixels**, so the icon is a large upscale. It is fine at the size a launcher
+actually draws it and visibly soft if you open the file. A vector (SVG/EPS/AI)
+or a 1024px crest would fix it outright — drop it in and re-run the script.
+
+The icon sits on a light ground because the crest is navy: on a brand-navy tile
+it would disappear. Same reason `BrandMark` keeps a light plate in dark mode.
 
 ## How the offline-first part works
 

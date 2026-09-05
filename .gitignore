@@ -30,3 +30,6 @@ GoogleService-Info.plist
 # Output of `npm run bundle:check`
 .expo-bundle-check/
 dist/
+
+# Scratch file the brand-asset script writes while pulling the JPEG out of a PDF.
+.brand-source.jpg

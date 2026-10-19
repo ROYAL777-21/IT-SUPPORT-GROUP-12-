@@ -6,6 +6,8 @@ Firebase Authentication and Firestore; there is no runtime demo-data source.
 Client validation and rules accept student `@vossie.net` and staff `@eduvos.com`
 accounts. Ordinary staff retain requester permissions until an administrator
 grants a support claim. The domain changes have not been deployed to Firebase.
+Microsoft sign-in uses the `organizations` audience with the owner's app
+registration. An Eduvos tenant ID is not required by the app or build workflow.
 
 ## Completed checks
 
@@ -13,7 +15,7 @@ grants a support claim. The domain changes have not been deployed to Firebase.
 | --- | --- |
 | Repeatable cloud install, including `npm ci` and dependency patch application | Passed |
 | TypeScript 6 type check | Passed |
-| Local authentication, SQLite, CRUD, sync and route regressions | 46 passed |
+| Local authentication, SQLite, CRUD, sync, route and build-configuration regressions | 51 passed |
 | Firestore emulator authorization suite | 44 passed; no skipped tests |
 | Expo Doctor | 21 of 21 checks passed |
 | Android JavaScript/Hermes export | Passed |
@@ -28,8 +30,10 @@ Rules tests use the isolated `demo-campus-it-help` emulator project.
 - The real Android `google-services.json` for **it-support-eduvos** is absent.
   Firebase CLI access was checked and requires authentication. The release
   configuration check correctly exits with an error; no fake configuration is generated.
-- Microsoft still requires Eduvos's Entra app registration, tenant ID and the
-  client ID/secret entered in Firebase. Follow [AUTH.md](AUTH.md); the secret
+- Microsoft still requires your own app registration for accounts in multiple
+  organizational directories and the client ID/secret entered in Firebase.
+  The app uses `organizations` and no longer requires Eduvos's tenant ID.
+  Eduvos may still require organizational consent. Follow [AUTH.md](AUTH.md); the secret
   must never enter the client bundle, repository or chat.
 - No APK, native device run, live sign-in or production deployment has been
   completed. Signing fingerprints and the device acceptance checks in

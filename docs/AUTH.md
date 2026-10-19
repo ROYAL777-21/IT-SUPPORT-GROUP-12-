@@ -17,40 +17,62 @@ exchange. No Microsoft client secret belongs in the app or its repository.
    below before building a release. Neither a Firebase project ID alone nor a
    web-app configuration replaces the Android file.
 
-## Set up the Eduvos tenant
+## Register your own Microsoft app
 
-Ask Eduvos IT to register or approve an application in the institution's Microsoft
-Entra tenant. A student account may not have permission to create registrations
-or grant organizational consent. They should provide the public Application
-(client) ID and Directory (tenant) ID, and enter the secret securely in Firebase.
+You can own the app registration in a Microsoft Entra directory you control.
+It does not have to be in Eduvos's directory, and you do not need Eduvos's tenant
+ID. Students and staff authenticate through their own Microsoft directories.
+You still need a real Microsoft app registration and Firebase provider setup.
 
-Confirm with IT that **studentnumber@vossie.net** and **name@eduvos.com** accounts
-belong to the same directory. The app currently targets one tenant. If they are
-in separate tenants, stop at this configuration step: IT must approve an app
-registration covering both, and the app's tenant configuration and release
-checks need to be updated before testing either group. Do not substitute an
-unrestricted tenant setting or guess a tenant ID.
-
-1. Open Microsoft Entra admin center → App registrations → New registration.
-   Use **IT SUPPORT** as the display name and accounts in the Eduvos directory
-   for an institution-only app.
-2. In Firebase project **it-support-eduvos**, open Authentication → Sign-in method
-   → Microsoft. Copy the callback URI shown there.
-3. In the Entra registration, add a **Web** redirect URI matching that Firebase
+1. Sign in to the [Microsoft Entra admin center](https://entra.microsoft.com/)
+   with an account allowed to register apps in your directory. If you have no
+   such directory or permission, obtain that access first; a personal Microsoft
+   email account alone does not guarantee app-registration access.
+2. Open **App registrations → New registration**. Name it **IT SUPPORT**.
+   For supported accounts, choose **Accounts in any organizational directory**
+   (also labelled **Multiple Entra ID tenants**). This enables other work and
+   school directories to use your registration. Do not select only your directory.
+3. In [Firebase Authentication](https://console.firebase.google.com/project/it-support-eduvos/authentication/providers),
+   select **Add new provider → Microsoft** and copy the callback URI shown there.
+   If Microsoft is already listed, edit that provider.
+4. In your Entra registration, add a **Web** redirect URI matching the Firebase
    callback exactly. With the standard Firebase auth domain it is
    `https://it-support-eduvos.firebaseapp.com/__/auth/handler`.
-4. Under Certificates & secrets, create a client secret. Copy its **Value**, not
-   its Secret ID, directly into Firebase's Microsoft provider settings. Also
-   enter the Application (client) ID from the registration's Overview page.
-5. Confirm delegated `User.Read` permission and any admin consent required by
-   Eduvos. Record the secret expiry and rotate it before it expires.
-6. Set `EXPO_PUBLIC_AZURE_TENANT_ID` to the Directory (tenant) ID and rebuild the
-   app. This ID is public; release validation requires a tenant GUID.
+   Firebase handles the exchange for the Android app; this is a Web redirect,
+   even though IT SUPPORT itself runs on Android.
+5. Copy **Overview → Application (client) ID** into Firebase's Microsoft
+   Application ID field. This identifies your app registration, not a directory.
+6. Open **Certificates & secrets → Client secrets → New client secret**. Copy
+   the secret's **Value**, not its Secret ID, directly into Firebase's Microsoft
+   secret field. Save and enable the provider. Store the value securely and
+   record its expiry; rotate it in Firebase before it expires. Do not send it
+   in chat, commit it, or put it in any app environment variable.
+7. Confirm the delegated Microsoft Graph **User.Read** permission under
+   **API permissions**. No directory-wide application permissions are needed
+   for this sign-in flow. Complete publisher verification if Microsoft's or
+   Eduvos's consent policy requires it.
+8. Build the app using the real Firebase Android configuration and register its
+   signing fingerprints as described below. No tenant ID environment variable
+   is required. An old `EXPO_PUBLIC_AZURE_TENANT_ID` setting is unused and can
+   be removed from local, cloud and GitHub Actions settings.
+9. Test a student `@vossie.net` account and a staff `@eduvos.com` account separately.
+   If Microsoft shows **Need admin approval**, ask Eduvos IT to approve your
+   application's client ID and delegated permissions. Owning the registration
+   does not bypass their consent policy, MFA or conditional-access requirements.
 
-The native provider uses `microsoft.com`, the tenant parameter, account selection
-and the `openid`, `profile`, `email`, `offline_access` and `User.Read` scopes.
+The app sends `tenant: 'organizations'`, Microsoft's endpoint for work and school
+accounts across organizational directories. Student and staff directories can
+be different. An unrelated organization's account can reach Microsoft sign-in,
+but client validation and Firestore rules deny it access to Eduvos data.
+Personal Microsoft accounts are outside the configured audience.
+
+The native provider uses `microsoft.com`, account selection, and the `openid`,
+`profile`, `email`, `offline_access` and `User.Read` scopes.
 React Native Firebase's `signInWithPopup` launches the native provider flow.
 This app needs a development client or an APK; Expo Go lacks its Firebase modules.
+
+Microsoft documents [app registration](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app)
+and the [`organizations` audience](https://learn.microsoft.com/en-us/entra/identity-platform/v2-protocols-oidc#find-your-apps-openid-configuration-document-uri).
 
 ## Firebase and Android
 
@@ -84,7 +106,7 @@ Accounts must verify their email
 before using protected data; the app supports resending verification and checking
 it again. Password-reset feedback avoids revealing whether an account exists.
 
-The tenant parameter guides Microsoft sign-in. Firestore independently enforces
+The organizational audience guides Microsoft sign-in. Firestore independently enforces
 verified institutional email and role claims. Rejected provider accounts are
 signed out even if cleaning up a new account fails.
 
@@ -127,12 +149,17 @@ After provider setup, rules deployment and APK installation, use real accounts:
    app-password reset on both domains.
 
 No real student or staff Microsoft sign-in has been verified in this checkout;
-the tenant, provider settings and Android client configuration are still required.
+the app registration, provider settings and Android client configuration are
+still required. Source and rules tests do not validate Microsoft consent or
+credentials in Firebase.
 
 ## Troubleshooting
 
 - Provider unavailable: confirm Microsoft is enabled in the correct Firebase
-  project and that its client ID, current secret value and tenant match.
+  project and that the client ID and current secret Value come from the same
+  app registration. Confirm it accepts accounts in any organizational directory.
+- Account not in directory: check the supported account types. A registration
+  limited to your own directory cannot accept Eduvos's student and staff accounts.
 - Redirect mismatch: copy the callback directly from Firebase into an Entra
   **Web** redirect. A development-client URI is not the Firebase callback.
 - Android flow fails: confirm the installed APK's signing fingerprints, package,

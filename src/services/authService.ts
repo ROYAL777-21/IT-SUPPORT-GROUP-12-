@@ -30,13 +30,10 @@ import type { AuthProviderId, Role } from '@/models/user';
  */
 const ALLOWED_EMAIL_DOMAINS = ['vossie.net', 'eduvos.com'];
 
-/**
- * Restricts "Continue with Microsoft" to one Entra ID tenant. Falling back to
- * 'common' lets any Microsoft account reach the Microsoft login page; they are
- * still rejected by the domain check afterwards, but the tenant gate is
- * cleaner and fails earlier, in Microsoft's own UI.
- */
-const AZURE_TENANT = process.env.EXPO_PUBLIC_AZURE_TENANT_ID || 'common';
+// The app registration accepts accounts from multiple organizational directories.
+// Microsoft authenticates the account; verified email and Firestore rules restrict
+// access to Eduvos. This does not require knowing Eduvos's directory ID.
+const MICROSOFT_TENANT = 'organizations';
 
 export function isInstitutionalEmail(email: string): boolean {
   return /^[^\s@]+@(vossie\.net|eduvos\.com)$/i.test(email.trim());
@@ -206,7 +203,7 @@ export async function signInWithMicrosoft(): Promise<User> {
   provider.addScope('offline_access');
   provider.addScope('User.Read');
   provider.setCustomParameters({
-    tenant: AZURE_TENANT,
+    tenant: MICROSOFT_TENANT,
     prompt: 'select_account',
   });
 

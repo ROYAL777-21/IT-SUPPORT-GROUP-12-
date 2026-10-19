@@ -10,9 +10,10 @@ authentication or native device behavior.
 - Real `google-services.json`, Email/Password enabled, and Microsoft enabled.
 - Entra client ID and client-secret **value** entered only in Firebase's Microsoft provider.
 - Exact Firebase callback URI registered as a Web redirect in Entra.
-- Eduvos Directory (tenant) ID set as `EXPO_PUBLIC_AZURE_TENANT_ID`.
-- Eduvos IT confirms both student `vossie.net` and staff `eduvos.com` accounts
-  are covered by the configured tenant and app registration.
+- Your Microsoft app registration accepts **accounts in any organizational
+  directory**, matching the app's `organizations` endpoint. No Eduvos tenant ID
+  is required. Confirm any required organizational consent for both student
+  `vossie.net` and staff `eduvos.com` accounts.
 - Android signing SHA-1 and SHA-256 registered in Firebase.
 - Current rules and indexes deployed after their emulator tests pass.
 - Owner-controlled signing key, backup, and confirmed update installation path for production distribution.

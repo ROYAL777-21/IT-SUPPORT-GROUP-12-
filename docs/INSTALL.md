@@ -4,8 +4,9 @@
 
 Use Firebase project `it-support-eduvos` and Android package
 `za.ac.eduvos.campusithelp`. Download the real `google-services.json` from Firebase
-Project settings and place it in the repository root. Add the Eduvos Directory
-(tenant) ID to `.env` as `EXPO_PUBLIC_AZURE_TENANT_ID`.
+Project settings and place it in the repository root. Microsoft uses the
+`organizations` endpoint with your own registration for accounts in any
+organizational directory. No Eduvos tenant ID or tenant environment variable is needed.
 
 Configure Firebase Authentication as described in [AUTH.md](AUTH.md). Do not put
 an Entra client secret or service-account key in the app.
@@ -40,7 +41,6 @@ Repository Actions settings need:
 | Setting | Location | Purpose |
 | --- | --- | --- |
 | `GOOGLE_SERVICES_JSON_BASE64` | Actions secret | Base64 encoding of the real Android client configuration |
-| `EXPO_PUBLIC_AZURE_TENANT_ID` | Actions variable or secret | Eduvos Directory (tenant) ID |
 
 Open Actions → **Validate and build Android** → **Run workflow**. Validation runs
 first, followed by the APK build. Download `it-support-android` from the run's

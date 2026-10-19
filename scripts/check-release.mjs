@@ -18,11 +18,7 @@ try {
   if (!client?.client_info?.mobilesdk_app_id || !client.api_key?.some((entry) => /^AIza[\w-]+$/.test(entry.current_key))) {
     throw new Error('Download the Android configuration for package za.ac.eduvos.campusithelp.');
   }
-  const tenant = process.env.EXPO_PUBLIC_AZURE_TENANT_ID ?? '';
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenant)) {
-    throw new Error('Set EXPO_PUBLIC_AZURE_TENANT_ID to the Eduvos Directory (tenant) ID before building a release.');
-  }
-  console.log('Release client configuration is present. Live provider setup still requires a device sign-in test.');
+  console.log('Android client configuration is present. Enable Microsoft with an app registration for multiple organizational directories in Firebase, then verify sign-in on a device.');
 } catch (error) {
   console.error(error.code === 'ENOENT'
     ? 'Release blocked: add the real google-services.json from it-support-eduvos or set GOOGLE_SERVICES_JSON to its file path.'

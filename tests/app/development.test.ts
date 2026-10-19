@@ -63,6 +63,7 @@ describe('identity and native authentication', () => {
     expect(provider.providerId).toBe('microsoft.com');
     expect(provider.scopes).toEqual(expect.arrayContaining(['openid','profile','email','offline_access','User.Read']));
     expect(provider.customParameters.prompt).toBe('select_account');
+    expect(provider.customParameters.tenant).toBe('organizations');
   });
   it('signs a rejected Microsoft account out even if deleting it fails', async () => {
     native.popup.mockResolvedValue({user:{...native.user,email:'guest@outlook.com'},additionalUserInfo:{isNewUser:true}});

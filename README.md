@@ -44,10 +44,11 @@ The Firebase project is **it-support-eduvos**.
    root, or set `GOOGLE_SERVICES_JSON` to that file's path. Keep the file out of Git.
 2. Enable Email/Password in Firebase Authentication. New password accounts must
    verify their email before accessing tickets.
-3. Configure the Microsoft provider using the Entra app registration described in
-   [docs/AUTH.md](docs/AUTH.md). Put its Directory (tenant) ID in
-   `EXPO_PUBLIC_AZURE_TENANT_ID`. The Microsoft client secret belongs in Firebase's
-   provider settings, never in the app or an `EXPO_PUBLIC_` variable.
+3. Register your own Microsoft app for **accounts in any organizational directory**
+   and configure Firebase's Microsoft provider as described in [docs/AUTH.md](docs/AUTH.md).
+   The app uses Microsoft's `organizations` endpoint, so no Eduvos tenant ID is
+   required. Put the Application ID and client-secret Value in Firebase's provider
+   settings, never in the app. Eduvos's consent policy may still require admin approval.
 4. Add the signing certificate SHA-1 and SHA-256 fingerprints for the Android build
    in Firebase Project settings. Obtain them from Gradle's `signingReport`.
 5. After the emulator tests pass, deploy the committed rules and indexes using an
@@ -72,7 +73,7 @@ npx expo run:android
 npm start
 ```
 
-The release check validates the client configuration and tenant ID. A passing
+The release check validates the Android client configuration. A passing
 configuration check does **not** establish that the Microsoft provider is enabled
 or that a real user can sign in. Verify both sign-in methods on an Android device
 before distributing the app.

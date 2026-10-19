@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, View } from 'react-native';
+import { useRouter } from 'expo-router';
 
 import { Button, Screen, Select, Text, TextField } from '@/components';
 import { useAuth } from '@/hooks/useAuth';
+import { useSync } from '@/hooks/useSync';
 import { CAMPUSES, isPlausibleStudentNumber } from '@/models/user';
 import { useTheme } from '@/theme';
 
@@ -15,8 +17,10 @@ const CAMPUS_OPTIONS = CAMPUSES.map((campus) => ({ value: campus, label: campus 
  * Asking once here rather than on every ticket is the point. The (app) layout
  * guard means the ticket form can then assume both are present.
  */
-export default function OnboardingScreen() {
-  const { profile, saveProfile, role } = useAuth();
+export default function OnboardingScreen({ editing = false }: { editing?: boolean }) {
+  const { profile, saveProfile, role, signOut } = useAuth();
+  const { notifyLocalWrite } = useSync();
+  const router = useRouter();
   const { spacing } = useTheme();
 
   const [name, setName] = useState(profile?.displayName ?? '');
@@ -53,6 +57,8 @@ export default function OnboardingScreen() {
         studentNumber: isSupport ? undefined : studentNumber,
         campus: isSupport ? undefined : (campus ?? undefined),
       });
+      notifyLocalWrite();
+      if (editing) router.back();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not save your details.');
     } finally {
@@ -65,7 +71,7 @@ export default function OnboardingScreen() {
       scroll
       footer={
         <Button
-          title="Continue"
+          title={editing ? 'Save changes' : 'Continue'}
           loading={saving}
           onPress={() => void submit()}
         />
@@ -73,7 +79,7 @@ export default function OnboardingScreen() {
     >
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={{ paddingTop: spacing.xxl, gap: spacing.xs }}>
-          <Text variant="title">A few details</Text>
+          <Text variant="title">{editing ? 'Your details' : 'A few details'}</Text>
           <Text tone="muted">
             {isSupport
               ? 'Confirm how your name should appear to students on the tickets you pick up.'
@@ -88,6 +94,7 @@ export default function OnboardingScreen() {
             value={name}
             onChangeText={setName}
             autoCapitalize="words"
+            maxLength={100}
             error={submitted ? nameError : null}
             editable={!saving}
           />
@@ -122,6 +129,8 @@ export default function OnboardingScreen() {
               {error}
             </Text>
           ) : null}
+          {!editing ? <Button title="Sign out" variant="ghost" disabled={saving}
+            onPress={() => void signOut().catch((cause) => setError(cause instanceof Error ? cause.message : 'Could not sign out.'))} /> : null}
         </View>
       </KeyboardAvoidingView>
     </Screen>

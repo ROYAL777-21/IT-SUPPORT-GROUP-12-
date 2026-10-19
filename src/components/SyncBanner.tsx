@@ -11,6 +11,7 @@ export interface SyncBannerProps {
   syncing: boolean;
   online: boolean;
   onRetry?: () => void;
+  error?: string | null;
 }
 
 /**
@@ -18,15 +19,17 @@ export interface SyncBannerProps {
  * just logged a ticket with no signal needs to know it is saved and queued —
  * silence there reads as data loss.
  */
-export function SyncBanner({ pending, syncing, online, onRetry }: SyncBannerProps) {
+export function SyncBanner({ pending, syncing, online, onRetry, error }: SyncBannerProps) {
   const { colors, radius, spacing } = useTheme();
 
   // Everything is up to date and we are connected: say nothing.
-  if (online && pending === 0 && !syncing) {
+  if (online && pending === 0 && !syncing && !error) {
     return null;
   }
 
-  const { bg, fg, icon, message } = !online
+  const { bg, fg, icon, message } = error && online && !syncing
+    ? { bg: colors.dangerTint, fg: colors.danger, icon: 'alert-circle-outline' as const, message: error }
+    : !online
     ? {
         bg: colors.warningTint,
         fg: colors.warning,

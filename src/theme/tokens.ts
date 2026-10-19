@@ -1,25 +1,17 @@
-/**
- * Design tokens for Campus IT Help.
- *
- * The Campus IT Help mockups (`ds-styles.css` and friends) are still not in
- * the repo, so this file stands in for them. It is deliberately the *only*
- * place a raw colour or measurement is written down: every component reads
- * from here, so when the real stylesheet does land, porting it means rewriting
- * this one file rather than hunting hex codes through the screens.
- */
+/** Shared colour, spacing and typography tokens for IT SUPPORT. */
 
-/** Eduvos brand red, and the ramp derived from it. */
+/** IT SUPPORT blue. Error and warning colours remain semantic. */
 const BRAND = {
-  50: '#fdecec',
-  100: '#f9c9c9',
-  200: '#f19d9d',
-  300: '#e77070',
-  400: '#dc4b4b',
-  500: '#c8102e', // primary
-  600: '#a80d27',
-  700: '#870a1f',
-  800: '#660718',
-  900: '#450410',
+  50: '#eff6ff',
+  100: '#dbeafe',
+  200: '#bfdbfe',
+  300: '#93c5fd',
+  400: '#60a5fa',
+  500: '#2563eb',
+  600: '#1d4ed8',
+  700: '#1e40af',
+  800: '#1e3a8a',
+  900: '#172554',
 } as const;
 
 const NEUTRAL = {
@@ -119,11 +111,11 @@ export const darkColors: ColorScheme = {
   text: NEUTRAL[50],
   textMuted: NEUTRAL[400],
   textFaint: NEUTRAL[500],
-  onPrimary: NEUTRAL[0],
+  onPrimary: NEUTRAL[950],
 
   primary: BRAND[400],
   primaryPressed: BRAND[300],
-  primaryTint: 'rgba(220, 75, 75, 0.16)',
+  primaryTint: 'rgba(96, 165, 250, 0.16)',
 
   info: SIGNAL.info.dark,
   infoTint: 'rgba(147, 180, 255, 0.14)',

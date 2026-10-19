@@ -1,117 +1,98 @@
 rules_version = '2';
-
-// Deploy with:  firebase deploy --only firestore:rules
-//
-// The client also checks some of these conditions for a better error message,
-// but these rules are the only enforcement that actually counts — anything
-// client-side can be bypassed.
-
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    function isSignedIn() {
-      return request.auth != null;
+    function institutional() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email is string
+        && request.auth.token.email.lower().matches('[^@ ]+@(eduvos[.]com|eduvos[.]ac[.]za)$');
     }
-
-    // Applies to both sign-in paths. A Microsoft account from outside the
-    // tenant reaches Firebase with a non-institutional email; the client
-    // rejects and cleans up, and this is what stops it mattering if that
-    // cleanup is bypassed.
-    function isInstitutionalEmail() {
-      return isSignedIn()
-        && request.auth.token.email.matches('.*@(eduvos[.]com|eduvos[.]ac[.]za)$');
+    function support() {
+      return institutional() && request.auth.token.get('support', false) == true;
     }
-
-    // Support agents are marked with a custom claim set from a trusted
-    // environment (scripts/grant-support.ts) — never from the app.
-    function isSupportAgent() {
-      return isSignedIn() && request.auth.token.support == true;
+    function text(value, minimum, maximum) {
+      return value is string && value.size() >= minimum && value.size() <= maximum;
     }
-
-    // Fields nobody may rewrite after creation. `createdBy` is the one the
-    // whole read model hangs off; `reference` is what the student quotes at
-    // the IT desk; `createdAt` is evidence of how long they have waited.
-    function immutableFieldsUnchanged() {
-      return request.resource.data.createdBy == resource.data.createdBy
-        && request.resource.data.reference == resource.data.reference
-        && request.resource.data.createdAt == resource.data.createdAt;
+    function optionalText(data, field, maximum) {
+      return data.get(field, null) == null || text(data[field], 0, maximum);
     }
-
-    match /users/{userId} {
-      function isSelf() {
-        return isSignedIn() && request.auth.uid == userId;
-      }
-
-      // Support needs to read profiles to show a student number alongside the
-      // ticket they are working.
-      allow read: if isSelf() || isSupportAgent();
-
-      // `role` is deliberately not writable. It exists on the document only so
-      // the UI can label an agent; the custom claim above is what actually
-      // authorises anything, and letting a user write this field would invite
-      // the assumption that it does something.
-      allow create, update: if isSelf()
-                            && isInstitutionalEmail()
-                            && !("role" in request.resource.data)
-                            && request.resource.data.uid == request.auth.uid;
-
-      // Profiles are not deleted; the account is what gets deleted.
-      allow delete: if false;
+    function validTicket(d, id) {
+      return d.keys().hasOnly(['id','reference','studentNumber','campus','category','priority','status',
+        'subject','description','location','assignedTo','assignedToName','createdBy','createdAt','updatedAt','deleted','serverUpdatedAt'])
+        && d.id == id && text(d.reference, 5, 50)
+        && text(d.studentNumber, 5, 20) && text(d.campus, 1, 100)
+        && d.category in ['wifi','account','hardware','software','email','lms','printing','other']
+        && d.priority in ['low','medium','high','urgent']
+        && d.status in ['open','in_progress','awaiting_student','resolved','closed']
+        && text(d.subject, 5, 100) && text(d.description, 1, 5000)
+        && optionalText(d, 'location', 200) && optionalText(d, 'assignedTo', 128)
+        && optionalText(d, 'assignedToName', 100)
+        && d.createdAt is number && d.updatedAt is number
+        && d.get('deleted', false) is bool && d.serverUpdatedAt == request.time;
     }
-
+    match /users/{uid} {
+      function self() { return institutional() && request.auth.uid == uid; }
+      allow read: if self() || support();
+      allow create, update: if self()
+        && request.resource.data.keys().hasOnly(['uid','email','displayName','studentNumber','campus','providerId','createdAt','updatedAt'])
+        && request.resource.data.uid == uid
+        && request.resource.data.email.lower() == request.auth.token.email.lower()
+        && text(request.resource.data.displayName, 0, 100)
+        && optionalText(request.resource.data, 'studentNumber', 20)
+        && optionalText(request.resource.data, 'campus', 100)
+        && request.resource.data.providerId in ['password','microsoft.com','unknown']
+        && request.resource.data.createdAt is number && request.resource.data.updatedAt is number;
+      allow delete: if self();
+    }
     match /tickets/{ticketId} {
-      function isOwner() {
-        return isSignedIn() && resource.data.createdBy == request.auth.uid;
+      function owner() { return institutional() && resource.data.createdBy == request.auth.uid; }
+      function immutable() {
+        return request.resource.data.id == resource.data.id
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.reference == resource.data.reference
+          && request.resource.data.createdAt == resource.data.createdAt;
       }
-
-      // Support reads the whole queue — that is what makes it a shared queue.
-      // A student can only ever read their own, which is also why a student's
-      // device never receives anyone else's rows to cache.
-      allow read: if isOwner() || isSupportAgent();
-
-      // A student may only create a ticket under their own uid, and only in
-      // the 'open' state — they cannot log something pre-resolved. Nor may
-      // they hand it to an agent on creation.
-      allow create: if isInstitutionalEmail()
-                    && request.resource.data.createdBy == request.auth.uid
-                    && request.resource.data.status == 'open'
-                    && request.resource.data.get('assignedTo', null) == null;
-
-      // Support may change anything except the immutable fields. A student may
-      // edit their own ticket but may not assign it — picking work up is the
-      // agents' side of the transaction.
-      allow update: if immutableFieldsUnchanged()
-                    && (
-                      isSupportAgent()
-                      || (
-                        isOwner()
-                        && request.resource.data.get('assignedTo', null)
-                             == resource.data.get('assignedTo', null)
-                        && request.resource.data.get('assignedToName', null)
-                             == resource.data.get('assignedToName', null)
-                      )
-                    );
-
-      allow delete: if isOwner() || isSupportAgent();
-
+      function studentTransition() {
+        return request.resource.data.status == resource.data.status
+          || (resource.data.status == 'resolved' && request.resource.data.status in ['open','closed'])
+          || (resource.data.status == 'closed' && request.resource.data.status == 'open');
+      }
+      // Creators check for a committed retry before uploading a new UUID.
+      // Missing documents contain no data; existing documents still require ownership.
+      allow get: if owner() || support() || (institutional()
+        && !exists(/databases/$(database)/documents/tickets/$(ticketId)));
+      allow list: if owner() || support();
+      allow create: if institutional() && validTicket(request.resource.data, ticketId)
+        && request.resource.data.createdBy == request.auth.uid
+        && (support() || (request.resource.data.status == 'open'
+          && request.resource.data.get('assignedTo', null) == null
+          && request.resource.data.get('assignedToName', null) == null));
+      allow update: if validTicket(request.resource.data, ticketId) && immutable()
+        && (!resource.data.get('deleted', false) || request.resource.data.get('deleted', false))
+        && (support() || (owner() && studentTransition()
+          && request.resource.data.get('assignedTo', null) == resource.data.get('assignedTo', null)
+          && request.resource.data.get('assignedToName', null) == resource.data.get('assignedToName', null)));
+      // Tombstones propagate deletions to offline devices; records stay available for audit.
+      allow delete: if false;
       match /comments/{commentId} {
-        function parentTicket() {
-          return get(/databases/$(database)/documents/tickets/$(ticketId)).data;
-        }
-
-        allow read: if isSupportAgent()
-                    || (isSignedIn() && parentTicket().createdBy == request.auth.uid);
-
-        allow create: if isSignedIn()
-                      && request.resource.data.authorId == request.auth.uid
-                      && (isSupportAgent() || parentTicket().createdBy == request.auth.uid)
-                      // Only support may post a comment marked as from support.
-                      // Without this a student could impersonate the IT desk in
-                      // their own thread.
-                      && (request.resource.data.fromSupport == false || isSupportAgent());
-
-        // Comments are an audit trail — no edits, no deletions.
-        allow update, delete: if false;
+        function parent() { return getAfter(/databases/$(database)/documents/tickets/$(ticketId)).data; }
+        function canAccess() { return institutional() && (support() || parent().createdBy == request.auth.uid); }
+        allow read: if institutional() && (support() ||
+          get(/databases/$(database)/documents/tickets/$(ticketId)).data.createdBy == request.auth.uid);
+        allow create: if canAccess() && !parent().get('deleted', false)
+          && !(parent().status in ['resolved','closed'])
+          && request.resource.data.keys().hasOnly(['id','ticketId','authorId','authorName','fromSupport','body','createdAt'])
+          && request.resource.data.id == commentId && request.resource.data.ticketId == ticketId
+          && request.resource.data.authorId == request.auth.uid
+          && text(request.resource.data.authorName, 1, 100)
+          && text(request.resource.data.body, 1, 4000)
+          && request.resource.data.createdAt is number
+          && request.resource.data.fromSupport is bool
+          && (request.resource.data.fromSupport == false || support());
+        // An identical retry is safe after a crash between server commit and local acknowledgement.
+        allow update: if canAccess() && resource.data.authorId == request.auth.uid
+          && request.resource.data == resource.data;
+        allow delete: if false;
       }
     }
   }

@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 
 import {
   Button,
+  EduvosLogo,
   MicrosoftButton,
   Screen,
   Text,
@@ -48,7 +49,8 @@ export default function SignInScreen() {
     <Screen scroll>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={{ paddingTop: spacing.xxxl, gap: spacing.xs }}>
-          <Text variant="display">Campus IT Help</Text>
+          <View style={{ marginBottom: spacing.lg }}><EduvosLogo /></View>
+          <Text variant="display">IT SUPPORT</Text>
           <Text tone="muted">
             Log a support ticket and track it, on or off campus Wi-Fi.
           </Text>

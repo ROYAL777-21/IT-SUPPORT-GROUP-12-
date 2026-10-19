@@ -1,4 +1,5 @@
 import type { ExpoConfig } from 'expo/config';
+import { existsSync } from 'node:fs';
 
 /**
  * Expo config as TypeScript rather than app.json so it can read the
@@ -13,7 +14,8 @@ const GOOGLE_SERVICES_PLIST =
   process.env.GOOGLE_SERVICES_PLIST ?? './GoogleService-Info.plist';
 
 const config: ExpoConfig = {
-  name: 'Campus IT Help',
+  name: 'IT SUPPORT',
+  icon: './assets/branding/eduvos-icon.png',
   slug: 'campus-it-help',
   version: '0.1.0',
   orientation: 'portrait',
@@ -23,14 +25,22 @@ const config: ExpoConfig = {
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'za.ac.eduvos.campusithelp',
-    googleServicesFile: GOOGLE_SERVICES_PLIST,
+    googleServicesFile: existsSync(GOOGLE_SERVICES_PLIST) ? GOOGLE_SERVICES_PLIST : undefined,
   },
   android: {
     package: 'za.ac.eduvos.campusithelp',
-    googleServicesFile: GOOGLE_SERVICES_JSON,
+    allowBackup: false,
+    googleServicesFile: existsSync(GOOGLE_SERVICES_JSON) ? GOOGLE_SERVICES_JSON : undefined,
   },
   plugins: [
     'expo-router',
+    'expo-font',
+    ['expo-splash-screen', {
+      image: './assets/branding/eduvos-logo.png',
+      imageWidth: 240,
+      resizeMode: 'contain',
+      backgroundColor: '#ffffff',
+    }],
     'expo-sqlite',
     '@react-native-firebase/app',
     '@react-native-firebase/auth',

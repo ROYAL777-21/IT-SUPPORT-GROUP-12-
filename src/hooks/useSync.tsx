@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { AppState } from 'react-native';
+import { addNetworkStateListener } from 'expo-network';
 
 import { countPending } from '@/services/ticketRepository';
 import { isOnline, sync, watchForChanges, type SyncResult } from '@/services/syncService';
@@ -37,7 +38,10 @@ export interface SyncState {
 const SyncContext = createContext<SyncState | null>(null);
 
 export function SyncProvider({ children }: { children: ReactNode }) {
-  const { user, role } = useAuth();
+  const { user, role, verified, profile, initialising } = useAuth();
+  const session = `${user?.uid ?? ''}:${role}:${verified}`;
+  const activeSession = useRef(session);
+  activeSession.current = session;
 
   const [syncing, setSyncing] = useState(false);
   const [online, setOnline] = useState(true);
@@ -57,23 +61,23 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   const refreshPendingCount = useCallback(async () => {
     try {
       const count = await countPending();
-      if (mounted.current) {
+      if (mounted.current && activeSession.current === session) {
         setPending(count);
       }
     } catch {
       // The badge is not worth an error state.
     }
-  }, []);
+  }, [session]);
 
   const refresh = useCallback(async () => {
-    if (!user) {
+    if (!user || !verified || initialising) {
       return;
     }
     setSyncing(true);
     setLastError(null);
     try {
       const result = await sync(user.uid, role);
-      if (!mounted.current) {
+      if (!mounted.current || activeSession.current !== session) {
         return;
       }
       setLastResult(result);
@@ -83,15 +87,18 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       }
     } catch (cause) {
       if (mounted.current) {
-        setLastError(cause instanceof Error ? cause.message : String(cause));
+        if (activeSession.current === session) {
+          setLastError('Some changes could not sync. Check your connection and the ticket status, then retry.');
+          setRevision((value) => value + 1);
+        }
       }
     } finally {
-      if (mounted.current) {
+      if (mounted.current && activeSession.current === session) {
         setSyncing(false);
       }
       await refreshPendingCount();
     }
-  }, [user, role, refreshPendingCount]);
+  }, [user, role, verified, initialising, session, refreshPendingCount]);
 
   const notifyLocalWrite = useCallback(() => {
     setRevision((value) => value + 1);
@@ -103,9 +110,11 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   // a student who reconnects on campus Wi-Fi should not have to pull to
   // refresh to see what support said.
   useEffect(() => {
-    if (!user) {
+    if (!user || !verified || initialising) {
       setPending(0);
       setLastResult(null);
+      setLastError(null);
+      setSyncing(false);
       return;
     }
 
@@ -117,18 +126,23 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    return () => subscription.remove();
-  }, [user, refresh]);
+    const network = addNetworkStateListener((state) => {
+      setOnline(Boolean(state.isConnected) && state.isInternetReachable !== false);
+      if (state.isConnected) void refresh();
+    });
+    const interval = setInterval(() => { void refresh(); }, 30_000);
+    return () => { subscription.remove(); network.remove(); clearInterval(interval); };
+  }, [user, verified, initialising, profile?.updatedAt, refresh]);
 
   // React to remote changes rather than waiting for the next foreground.
   useEffect(() => {
-    if (!user) {
+    if (!user || !verified || initialising) {
       return;
     }
     return watchForChanges(user.uid, role, () => {
       void refresh();
-    });
-  }, [user, role, refresh]);
+    }, (message) => setLastError(message));
+  }, [user, role, verified, initialising, refresh]);
 
   useEffect(() => {
     let cancelled = false;

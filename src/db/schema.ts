@@ -104,6 +104,24 @@ export const MIGRATIONS: Migration[] = [
          ON ticket_comments (sync_state);`,
     ],
   },
+  {
+    version: 3,
+    statements: [
+      `ALTER TABLE user_profiles ADD COLUMN sync_state TEXT NOT NULL DEFAULT 'pending';`,
+      `ALTER TABLE user_profiles ADD COLUMN sync_version INTEGER NOT NULL DEFAULT 1;`,
+      `ALTER TABLE user_profiles ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0;`,
+      `ALTER TABLE tickets ADD COLUMN sync_version INTEGER NOT NULL DEFAULT 1;`,
+      `ALTER TABLE tickets ADD COLUMN remote_exists INTEGER NOT NULL DEFAULT 0;`,
+      `ALTER TABLE tickets ADD COLUMN pending_fields TEXT NOT NULL DEFAULT '{}';`,
+      `UPDATE tickets SET remote_exists = 1 WHERE sync_state = 'synced';`,
+      // Older queues did not record changed fields. Preserve their pending
+      // values; server rules still reject stale status or assignment changes.
+      `UPDATE tickets SET pending_fields = '{"studentNumber":true,"campus":true,"category":true,"priority":true,"status":true,"subject":true,"description":true,"location":true,"deleted":true}'
+         WHERE sync_state = 'pending';`,
+      `UPDATE tickets SET pending_fields = json_patch(pending_fields, '{"assignedTo":true,"assignedToName":true}')
+         WHERE sync_state = 'pending' AND EXISTS (SELECT 1 FROM user_profiles WHERE role = 'support');`,
+    ],
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

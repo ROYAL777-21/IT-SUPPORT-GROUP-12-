@@ -40,10 +40,8 @@ export interface UserProfile {
   studentNumber?: string;
   campus?: string;
   /**
-   * Mirrors the `support` custom claim. Stored on the document only so support
-   * agents can be listed and shown in the UI — it is NOT what authorises
-   * anything. The claim on the ID token is, and firestore.rules forbids a user
-   * from writing this field.
+   * Local mirror of the support custom claim. Never written to Firestore.
+   * The verified claim on the ID token authorizes support access.
    */
   role: Role;
   providerId: AuthProviderId;

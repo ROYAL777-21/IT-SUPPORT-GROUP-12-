@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { INSTITUTIONAL_DOMAINS, isInstitutionalEmail } from '@/services/authService';
 import { useTheme } from '@/theme';
 
-const MIN_PASSWORD_LENGTH = 6;
+const MIN_PASSWORD_LENGTH = 12;
 
 export default function SignUpScreen() {
   const { register, busy } = useAuth();
@@ -68,7 +68,8 @@ export default function SignUpScreen() {
             autoCapitalize="words"
             autoComplete="name"
             textContentType="name"
-            placeholder="Thandi Mokoena"
+            placeholder="Your full name"
+            maxLength={100}
             error={submitted ? nameError : null}
             editable={!busy}
           />
@@ -118,8 +119,8 @@ export default function SignUpScreen() {
           >
             <Ionicons name="mail-outline" size={18} color={colors.info} />
             <Text variant="caption" style={{ flex: 1, color: colors.info }}>
-              We will email you a link to verify your address. You can start
-              logging tickets straight away.
+              Verify your email address before accessing tickets. We will send
+              you a verification link after registration.
             </Text>
           </View>
 

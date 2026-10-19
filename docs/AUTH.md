@@ -1,159 +1,94 @@
 # Authentication
 
-Two ways in: an Eduvos email address with a password, or an Eduvos Microsoft
-account. Both land on the same Firebase user record and the same
-`users/{uid}` profile.
+IT SUPPORT uses the native Firebase Authentication SDK for Eduvos password and
+Microsoft accounts. Firebase manages credentials, sessions and the OAuth
+exchange. No Microsoft client secret belongs in the app or its repository.
 
-## Why this app uses the native Firebase SDK
+## Set up the Eduvos tenant
 
-This is the decision that shaped the rest of the stack, so it is worth stating
-plainly: **Microsoft sign-in is not possible with Firebase's JavaScript SDK on
-React Native.**
+Ask Eduvos IT to register or approve an application in the institution's Microsoft
+Entra tenant. A student account may not have permission to create registrations
+or grant organizational consent. They should provide the public Application
+(client) ID and Directory (tenant) ID, and enter the secret securely in Firebase.
 
-The obvious approach — run the OAuth flow yourself with `expo-auth-session`,
-take the `id_token` Microsoft returns, and hand it to Firebase — does not work.
-Firebase rejects it:
+1. Open Microsoft Entra admin center → App registrations → New registration.
+   Use **IT SUPPORT** as the display name and accounts in the Eduvos directory
+   for an institution-only app.
+2. In Firebase project **it-support-eduvos**, open Authentication → Sign-in method
+   → Microsoft. Copy the callback URI shown there.
+3. In the Entra registration, add a **Web** redirect URI matching that Firebase
+   callback exactly. With the standard Firebase auth domain it is
+   `https://it-support-eduvos.firebaseapp.com/__/auth/handler`.
+4. Under Certificates & secrets, create a client secret. Copy its **Value**, not
+   its Secret ID, directly into Firebase's Microsoft provider settings. Also
+   enter the Application (client) ID from the registration's Overview page.
+5. Confirm delegated `User.Read` permission and any admin consent required by
+   Eduvos. Record the secret expiry and rotate it before it expires.
+6. Set `EXPO_PUBLIC_AZURE_TENANT_ID` to the Directory (tenant) ID and rebuild the
+   app. This ID is public; release validation requires a tenant GUID.
 
-```
-auth/internal-error
-INVALID_CREDENTIAL_OR_PROVIDER_ID : Invalid IdP response/credential
-```
+The native provider uses `microsoft.com`, the tenant parameter, account selection
+and the `openid`, `profile`, `email`, `offline_access` and `User.Read` scopes.
+React Native Firebase's `signInWithPopup` launches the native provider flow.
+This app needs a development client or an APK; Expo Go lacks its Firebase modules.
 
-That is not a configuration mistake. Firebase's own documentation states the
-manual sign-in flow is unsupported for Microsoft: unlike Google or Apple, the
-`microsoft.com` provider cannot be driven by `signInWithCredential` at all.
-Firebase insists on running the whole OAuth exchange itself, using the client
-ID and secret configured in the Firebase console. The JS SDK does that with
-`signInWithPopup` / `signInWithRedirect`, both of which are browser APIs that
-do not exist in React Native.
+## Firebase and Android
 
-So the provider flow has to be driven by the **native** Firebase SDK, which is
-what `@react-native-firebase` gives us. Its `signInWithPopup` is not a browser
-popup — on Android and iOS it opens the native provider activity.
+1. Register package `za.ac.eduvos.campusithelp` in **it-support-eduvos** and download
+   `google-services.json`. Put it in the repository root or set
+   `GOOGLE_SERVICES_JSON` to its path. Keep it out of Git.
+2. Enable Email/Password and Microsoft in Firebase Authentication. Configure the
+   email verification and password-reset templates for the application.
+3. Add the APK signing certificate SHA-1 and SHA-256 fingerprints to the Firebase
+   Android app. Gradle's `signingReport` prints them. Use the same signing key for
+   updates; production signing is separate from a development keystore.
+4. Run the rules tests, then deploy `firestore.rules` and `firestore.indexes.json`
+   using an authorized Firebase account. Follow [RELEASE.md](RELEASE.md) on a
+   real Android device before distribution.
 
-The alternatives were considered and rejected:
+Changing the display name to IT SUPPORT leaves the technical package and OAuth
+scheme stable, preserving Firebase registration and Android update compatibility.
 
-| Option | Why not |
-| --- | --- |
-| Custom OIDC provider for Entra ID | Works, and `signInWithCredential` is supported for OIDC providers — but custom OIDC needs Firebase Auth upgraded to Identity Platform, which requires the **Blaze** plan and a billing account. |
-| Cloud Function minting a custom token | Works, full control — but Cloud Functions also require **Blaze**, plus a function to deploy and maintain. |
-| Native SDK, built-in `microsoft.com` provider | **Chosen.** Free Spark plan, no server code, no billing account. |
+## Access and account behavior
 
-The cost is that Expo Go can no longer run this app. That is not really a cost:
-Expo Go cannot handle OAuth redirects for *any* provider, because the app
-scheme cannot be customised there. Development happens in a dev build either
-way.
+Both sign-in methods require an `eduvos.com` or `eduvos.ac.za` address. Password
+registration requires at least 12 characters. Accounts must verify their email
+before using protected data; the app supports resending verification and checking
+it again. Password-reset feedback avoids revealing whether an account exists.
 
-## The one function
+The tenant parameter guides Microsoft sign-in. Firestore independently enforces
+verified institutional email and role claims. Rejected provider accounts are
+signed out even if cleaning up a new account fails.
 
-`signInWithMicrosoft()` in `src/services/authService.ts` is the only
-Microsoft-aware code in the app, deliberately. If the native flow ever has to
-be swapped for the OIDC or custom-token fallback, that swap touches one file.
+If Firebase returns an account conflict between password and Microsoft providers,
+the app directs the user to the existing password sign-in. Automatic provider
+linking is not implemented; test the institution's existing-account behavior
+before rollout rather than assuming the two providers share a UID.
 
-```ts
-const provider = new OAuthProvider('microsoft.com');
-provider.addScope('openid');
-provider.addScope('profile');
-provider.addScope('email');
-provider.addScope('offline_access');  // gets a refresh token
-provider.addScope('User.Read');
-provider.setCustomParameters({
-  tenant: AZURE_TENANT,          // EXPO_PUBLIC_AZURE_TENANT_ID, or 'common'
-  prompt: 'select_account',
-});
+## Support permissions
 
-const credential = await signInWithPopup(getFirebaseAuth(), provider);
-```
+An administrator grants the `support` custom claim using a trusted environment:
 
-## Keeping outsiders out
-
-Two gates, and they do different jobs.
-
-**The tenant parameter** (`EXPO_PUBLIC_AZURE_TENANT_ID`) stops a personal
-Microsoft account from even reaching the sign-in step — Microsoft's own UI
-refuses it, which is the clearest possible error message. Leave it unset and
-it falls back to `common`, which lets anyone through to the second gate.
-
-**The email domain check** runs after Firebase has signed the person in. By
-that point Firebase has *already created a user record*, so rejecting means
-cleaning up: a brand-new account is deleted outright rather than left as an
-orphan that can never sign in again, and a pre-existing one is signed out.
-
-Neither of these is enforcement. `firestore.rules` re-checks the domain
-server-side, and that is the check that counts — anything the client decides
-can be bypassed by talking to Firestore directly. `tests/firestore-rules.test.mjs`
-covers exactly that case.
-
-## Roles
-
-There is one role that matters: `support`. It is a **custom claim** on the
-Firebase ID token, set only from a trusted environment:
-
-```bash
+```sh
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 npm run grant-support -- itdesk@eduvos.com
 ```
 
-`firestore.rules` reads `request.auth.token.support`, and
-`authService.getRole()` reads the same claim from `getIdTokenResult()`. The
-`role` field on the `users/{uid}` document is display only — the rules
-explicitly refuse to let a user write it, so nobody can promote themselves by
-editing their own profile.
-
-Claims are baked into the ID token, which is cached for up to an hour, so an
-agent must sign out and back in after being granted the claim. The profile
-screen's refresh path forces it with `getIdTokenResult(user, true)`.
-
-`getRole()` fails closed: if the token cannot be refreshed — offline, most
-likely — it returns `student`, the least privileged answer.
-
-## Setting it up
-
-### Firebase console
-
-1. **Authentication → Sign-in method → Email/Password** → enable.
-2. **Authentication → Sign-in method → Microsoft** → enable. It asks for an
-   Application (client) ID and a client secret; get those from Azure below.
-   Note the **callback URL** it shows you — you need it in Azure.
-
-### Azure portal (Microsoft Entra ID)
-
-1. **App registrations → New registration.**
-2. Under **Redirect URI**, choose platform **Web** and paste the callback URL
-   Firebase gave you. It looks like:
-   `https://<your-project>.firebaseapp.com/__/auth/handler`
-   It must match exactly — a wrong redirect URI here is the single most common
-   cause of Microsoft sign-in failing with an opaque error.
-3. **Certificates & secrets → New client secret.** Copy the *value* (not the
-   ID) into the Firebase Microsoft provider, along with the Application
-   (client) ID from the Overview page.
-4. Copy the **Directory (tenant) ID** from Overview into `.env` as
-   `EXPO_PUBLIC_AZURE_TENANT_ID`.
-5. **API permissions** → make sure `User.Read` is granted (it is by default).
-
-### The app
-
-`google-services.json` from the Firebase console (Project settings → Your apps
-→ Android app, package `za.ac.eduvos.campusithelp`) goes in the project root.
-It is gitignored — see the README for how EAS gets it.
+Never bundle that administrative key. To revoke access, add `--revoke`. The
+profile screen can refresh permissions; signing out and back in also refreshes
+the session. A role lookup failure falls back to student permissions. Profiles
+store the role locally for display and never upload it as an authorization field.
 
 ## Troubleshooting
 
-**"Unable to process request due to missing initial state."**
-The redirect URI in Azure does not match the one Firebase expects. Re-check
-step 2 above, character for character, including `https://` and the trailing
-`/__/auth/handler`.
-
-**Sign-in opens and immediately closes with no error.**
-Usually the app `scheme` is missing or the dev build predates it. `scheme` is
-set in `app.config.ts`; changing it needs `npx expo prebuild --clean` and a new
-dev build.
-
-**"That is not an Eduvos account."**
-Working as intended — the account's email is outside the allowed domains. Add
-the domain to `ALLOWED_EMAIL_DOMAINS` in `authService.ts` *and* to the
-`isInstitutionalEmail()` regex in `firestore.rules`. Changing only the first
-gets you a client that lets them in and a server that refuses every write.
-
-**An agent still sees the student tabs after being granted `support`.**
-Their ID token is cached. Sign out and back in.
+- Provider unavailable: confirm Microsoft is enabled in the correct Firebase
+  project and that its client ID, current secret value and tenant match.
+- Redirect mismatch: copy the callback directly from Firebase into an Entra
+  **Web** redirect. A development-client URI is not the Firebase callback.
+- Android flow fails: confirm the installed APK's signing fingerprints, package,
+  native configuration and callback; rebuild after configuration changes.
+- Organizational consent required: ask Eduvos IT to approve the registration
+  and requested permissions in the institution's tenant.
+- Data denied after sign-in: verify the email, refresh permissions, and confirm
+  the compatible rules and indexes are deployed. An email domain change needs
+  matching changes to client validation and server rules.

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
 import {
   Button,
@@ -25,8 +26,9 @@ const PROVIDER_LABELS: Record<AuthProviderId, string> = {
 };
 
 export default function ProfileScreen() {
-  const { user, profile, role, signOut } = useAuth();
-  const { pending, syncing, online, lastResult, refresh } = useSync();
+  const { user, profile, role, signOut, deleteProfile, refreshRole } = useAuth();
+  const { pending, syncing, online, lastResult, lastError, refresh, notifyLocalWrite } = useSync();
+  const router = useRouter();
   const { colors, spacing } = useTheme();
 
   const [notice, setNotice] = useState<string | null>(null);
@@ -50,20 +52,28 @@ export default function ProfileScreen() {
   function confirmSignOut() {
     Alert.alert(
       'Sign out?',
-      // Worth spelling out: sign-out wipes the local cache, so anything that
-      // has not uploaded yet is genuinely gone, not just hidden.
       pending > 0
-        ? `You have ${pending} ${pending === 1 ? 'change' : 'changes'} that have not uploaded yet. Signing out will discard them.`
-        : 'Your tickets stay on the server. This device will clear its offline copy.',
+        ? `You have ${pending} changes waiting to upload. They stay on this device for your next sign-in.`
+        : 'Your saved data will be available when you sign in again.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Sign out',
           style: 'destructive',
-          onPress: () => void signOut(),
+          onPress: () => void signOut().catch((cause) => setNotice(cause instanceof Error ? cause.message : 'Could not sign out.')),
         },
       ],
     );
+  }
+
+  function confirmDeleteProfile() {
+    Alert.alert('Delete profile details?',
+      'Your name, campus and student number will be removed from your profile. Your account and support tickets are retained. You will need to enter your details again to log tickets.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete details', style: 'destructive', onPress: () => {
+          void deleteProfile().then(notifyLocalWrite).catch((cause) => setNotice(cause instanceof Error ? cause.message : 'Could not delete profile.'));
+        } },
+      ]);
   }
 
   return (
@@ -96,6 +106,7 @@ export default function ProfileScreen() {
           pending={pending}
           syncing={syncing}
           online={online}
+          error={lastError}
           onRetry={() => void refresh()}
         />
 
@@ -158,17 +169,23 @@ export default function ProfileScreen() {
                   ? 'Firebase is not configured on this build'
                   : pending > 0
                     ? `${pending} ${pending === 1 ? 'change' : 'changes'} waiting to upload`
-                    : 'Everything is up to date'
+                    : lastError ? 'Sync failed — tap to retry'
+                      : !online ? 'Offline — showing saved data'
+                        : lastResult ? 'Everything is up to date' : 'Waiting for first sync'
             }
             leading={<Ionicons name="sync-outline" size={20} color={colors.textMuted} />}
             onPress={() => void refresh()}
           />
         </Card>
 
+        <Button title="Edit profile" onPress={() => router.push('/(app)/edit-profile')} />
+        <Button title="Refresh account permissions" variant="secondary"
+          onPress={() => void refreshRole().catch((cause) => setNotice(cause instanceof Error ? cause.message : 'Could not refresh account.'))} />
+        <Button title="Delete profile details" variant="ghost" onPress={confirmDeleteProfile} />
         <Button title="Sign out" variant="secondary" onPress={confirmSignOut} />
 
         <Text variant="caption" tone="faint" center>
-          Campus IT Help · Group 12
+          IT SUPPORT · Group 12
           {profile?.updatedAt ? ` · profile updated ${relativeTime(profile.updatedAt)}` : ''}
         </Text>
       </View>

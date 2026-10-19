@@ -3,7 +3,8 @@ import {
   createUserWithEmailAndPassword,
   deleteUser,
   getIdTokenResult,
-  onAuthStateChanged,
+  onIdTokenChanged,
+  reload,
   sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
@@ -16,7 +17,7 @@ import {
 } from '@react-native-firebase/auth';
 
 import { getFirebaseAuth, isFirebaseConfigured } from '@/config/firebase';
-import { resetDatabase } from '@/db/database';
+import { deactivateDatabase } from '@/db/database';
 import type { AuthProviderId, Role } from '@/models/user';
 
 /**
@@ -38,8 +39,7 @@ const ALLOWED_EMAIL_DOMAINS = ['eduvos.com', 'eduvos.ac.za'];
 const AZURE_TENANT = process.env.EXPO_PUBLIC_AZURE_TENANT_ID || 'common';
 
 export function isInstitutionalEmail(email: string): boolean {
-  const domain = email.trim().toLowerCase().split('@')[1];
-  return Boolean(domain) && ALLOWED_EMAIL_DOMAINS.includes(domain);
+  return /^[^\s@]+@(eduvos\.com|eduvos\.ac\.za)$/i.test(email.trim());
 }
 
 /** For UI copy — "use your @eduvos.ac.za address". */
@@ -64,11 +64,13 @@ export class AuthError extends Error {
 const MESSAGES: Record<string, string> = {
   'auth/invalid-email': 'That email address does not look right.',
   'auth/user-disabled': 'This account has been disabled. Contact the IT desk.',
-  'auth/user-not-found': 'No account found for that email address.',
-  'auth/wrong-password': 'Incorrect password. Try again or reset it.',
+  'auth/user-not-found': 'Incorrect email or password.',
+  'auth/wrong-password': 'Incorrect email or password.',
   'auth/invalid-credential': 'Incorrect email or password.',
   'auth/email-already-in-use': 'That email address already has an account. Sign in instead.',
-  'auth/weak-password': 'Choose a password of at least 6 characters.',
+  'auth/weak-password': 'Choose a password of at least 12 characters.',
+  'auth/operation-not-allowed': 'This sign-in method is not available yet. Contact the IT desk.',
+  'auth/invalid-oauth-client-id': 'Microsoft sign-in is not available yet. Contact the IT desk.',
   'auth/too-many-requests': 'Too many attempts. Wait a few minutes and try again.',
   'auth/network-request-failed':
     'Could not reach Firebase. Check your connection — tickets you already have are still readable offline.',
@@ -98,7 +100,7 @@ function toAuthError(cause: unknown, fallback: string): AuthError {
 function requireConfigured(): void {
   if (!isFirebaseConfigured) {
     throw new AuthError(
-      'Firebase is not configured on this build, so signing in is not possible. See README.md.',
+      'Sign-in is unavailable in this build. Contact the IT desk for an updated app.',
     );
   }
 }
@@ -107,13 +109,14 @@ function requireConfigured(): void {
 
 export async function signIn(email: string, password: string): Promise<User> {
   requireConfigured();
+  if (!isInstitutionalEmail(email)) throw new AuthError('Use your Eduvos email address to sign in.');
   try {
     const credential = await signInWithEmailAndPassword(
       getFirebaseAuth(),
-      email.trim(),
+      email.trim().toLowerCase(),
       password,
     );
-    return credential.user;
+    return enforceInstitutionalAccount(credential);
   } catch (cause) {
     throw toAuthError(cause, 'Could not sign in. Please try again.');
   }
@@ -129,11 +132,13 @@ export async function register(
   if (!isInstitutionalEmail(email)) {
     throw new AuthError('Please register with your Eduvos student email address.');
   }
+  if (password.length < 12) throw new AuthError('Choose a password of at least 12 characters.');
+  if (!displayName.trim() || displayName.trim().length > 100) throw new AuthError('Enter your full name (up to 100 characters).');
 
   try {
     const credential = await createUserWithEmailAndPassword(
       getFirebaseAuth(),
-      email.trim(),
+      email.trim().toLowerCase(),
       password,
     );
     await updateProfile(credential.user, { displayName: displayName.trim() });
@@ -150,9 +155,11 @@ export async function register(
 
 export async function sendPasswordReset(email: string): Promise<void> {
   requireConfigured();
+  if (!isInstitutionalEmail(email)) throw new AuthError('Enter your Eduvos email address.');
   try {
-    await sendPasswordResetEmail(getFirebaseAuth(), email.trim());
+    await sendPasswordResetEmail(getFirebaseAuth(), email.trim().toLowerCase());
   } catch (cause) {
+    if ((cause as { code?: string })?.code === 'auth/user-not-found') return;
     throw toAuthError(cause, 'Could not send the reset email. Please try again.');
   }
 }
@@ -239,11 +246,11 @@ async function enforceInstitutionalAccount(credential: UserCredential): Promise<
   try {
     if (isNewUser) {
       await deleteUser(user);
-    } else {
-      await signOut(getFirebaseAuth());
     }
   } catch {
-    // Cleanup is best effort; the throw below is what matters to the student.
+    // A failed account deletion must not leave a rejected account signed in.
+  } finally {
+    await signOut(getFirebaseAuth());
   }
 
   throw new AuthError(
@@ -255,12 +262,12 @@ async function enforceInstitutionalAccount(credential: UserCredential): Promise<
 
 // --- Session ----------------------------------------------------------------
 
-/** Signs out and clears the cache so the next user cannot read these tickets. */
+/** Detach this account's cache; queued changes remain available when it signs in again. */
 export async function logOut(): Promise<void> {
   if (isFirebaseConfigured) {
     await signOut(getFirebaseAuth());
   }
-  await resetDatabase();
+  deactivateDatabase();
 }
 
 export function getCurrentUser(): User | null {
@@ -273,7 +280,15 @@ export function observeAuth(callback: (user: User | null) => void): () => void {
     callback(null);
     return () => {};
   }
-  return onAuthStateChanged(getFirebaseAuth(), callback);
+  return onIdTokenChanged(getFirebaseAuth(), callback);
+}
+
+export async function refreshSession(): Promise<User | null> {
+  const user = getCurrentUser();
+  if (!user) return null;
+  await reload(user);
+  await getIdTokenResult(user, true);
+  return getCurrentUser();
 }
 
 /**

@@ -21,6 +21,7 @@ import {
   type TicketPriority,
 } from '@/models/ticket';
 import { createTicket } from '@/services/ticketRepository';
+import { CAMPUSES } from '@/models/user';
 import { useTheme } from '@/theme';
 
 const CATEGORY_OPTIONS = TICKET_CATEGORIES.map((category) => ({
@@ -44,7 +45,7 @@ const PRIORITY_OPTIONS = TICKET_PRIORITIES.map((priority) => ({
 
 export default function NewTicketScreen() {
   const router = useRouter();
-  const { user, profile } = useAuth();
+  const { user, profile, role } = useAuth();
   const { notifyLocalWrite, online } = useSync();
   const { colors, spacing } = useTheme();
 
@@ -53,6 +54,8 @@ export default function NewTicketScreen() {
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
+  const [studentNumber, setStudentNumber] = useState(profile?.studentNumber ?? '');
+  const [campus, setCampus] = useState<string | null>(profile?.campus ?? null);
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -95,8 +98,8 @@ export default function NewTicketScreen() {
       // case a "the Wi-Fi is down" ticket has to survive.
       const ticket = await createTicket(
         {
-          studentNumber: profile.studentNumber ?? '',
-          campus: profile.campus ?? '',
+          studentNumber: role === 'support' ? studentNumber : profile.studentNumber ?? '',
+          campus: role === 'support' ? campus ?? '' : profile.campus ?? '',
           category,
           priority,
           subject: subject.trim(),
@@ -141,6 +144,11 @@ export default function NewTicketScreen() {
             </View>
           ) : null}
 
+          {role === 'support' ? <>
+            <TextField label="Student number" value={studentNumber} onChangeText={setStudentNumber} maxLength={20} required />
+            <Select label="Campus" value={campus} onChange={setCampus} required
+              options={CAMPUSES.map((value) => ({value, label:value}))} />
+          </> : null}
           <Select
             label="What is this about?"
             required
@@ -175,6 +183,7 @@ export default function NewTicketScreen() {
             multiline
             value={description}
             onChangeText={setDescription}
+            maxLength={5000}
             placeholder="What you were doing, what you expected, and what happened instead. Include any error message."
             error={submitted ? descriptionError : null}
             editable={!saving}
@@ -184,6 +193,7 @@ export default function NewTicketScreen() {
             label="Where on campus?"
             value={location}
             onChangeText={setLocation}
+            maxLength={200}
             placeholder="Lab 3, Library, Residence block B…"
             hint="Optional, but it gets someone to you faster."
             editable={!saving}

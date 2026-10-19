@@ -1,6 +1,7 @@
 export { Button, type ButtonProps, type ButtonVariant } from './Button';
 export { Card, type CardProps } from './Card';
 export { Divider } from './Divider';
+export { EduvosLogo } from './EduvosLogo';
 export { EmptyState, type EmptyStateProps } from './EmptyState';
 export { FilterChip, type FilterChipProps } from './FilterChip';
 export { ListItem, type ListItemProps } from './ListItem';

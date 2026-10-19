@@ -2,10 +2,12 @@
  * The signed-in person, as the app understands them.
  *
  * Firebase Auth owns identity (uid, email, provider). This model owns the
- * campus-specific facts Firebase has no idea about — student number, campus,
+ * campus-specific facts Firebase has no idea about — institutional number, campus,
  * and whether the person answers tickets rather than logs them.
  */
 
+// The persisted 'student' role covers all requesters, including ordinary staff.
+// Employment alone never grants access to the shared support queue.
 export const ROLES = ['student', 'support'] as const;
 export type Role = (typeof ROLES)[number];
 
@@ -34,8 +36,8 @@ export interface UserProfile {
   email: string;
   displayName: string;
   /**
-   * Empty until onboarding. Support agents never have one, which is why this
-   * is optional rather than required on the type.
+   * Student or staff number. Keep the existing storage key for compatibility.
+   * Empty until onboarding; optional for support agents.
    */
   studentNumber?: string;
   campus?: string;
@@ -54,13 +56,12 @@ export type ProfileDraft = Pick<UserProfile, 'displayName'> &
   Partial<Pick<UserProfile, 'studentNumber' | 'campus'>>;
 
 /**
- * A student number is complete enough to log a ticket against. Deliberately
- * loose — institutions renumber, and rejecting a valid number is worse than
- * accepting an odd one, since support can always ask.
+ * Student and staff numbering formats differ. Validate a bounded identifier,
+ * not institutional membership: Firebase identity and rules enforce access.
  */
-export function isPlausibleStudentNumber(value: string): boolean {
+export function isPlausibleInstitutionNumber(value: string): boolean {
   const trimmed = value.trim();
-  return trimmed.length >= 5 && trimmed.length <= 20 && /^[A-Za-z0-9-]+$/.test(trimmed);
+  return trimmed.length >= 1 && trimmed.length <= 20 && /^[A-Za-z0-9-]+$/.test(trimmed);
 }
 
 /** Initials for the profile avatar. */

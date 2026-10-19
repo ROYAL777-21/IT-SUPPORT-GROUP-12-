@@ -11,6 +11,8 @@ authentication or native device behavior.
 - Entra client ID and client-secret **value** entered only in Firebase's Microsoft provider.
 - Exact Firebase callback URI registered as a Web redirect in Entra.
 - Eduvos Directory (tenant) ID set as `EXPO_PUBLIC_AZURE_TENANT_ID`.
+- Eduvos IT confirms both student `vossie.net` and staff `eduvos.com` accounts
+  are covered by the configured tenant and app registration.
 - Android signing SHA-1 and SHA-256 registered in Firebase.
 - Current rules and indexes deployed after their emulator tests pass.
 - Owner-controlled signing key, backup, and confirmed update installation path for production distribution.
@@ -36,9 +38,11 @@ only in tests; they do not simulate a working backend inside the application.
 
 1. Register an institutional email account; verify that tickets remain blocked
    until the email link is confirmed. Sign in, sign out, and reset its password.
-2. Sign in with an Eduvos Microsoft account. Cancel the provider screen and retry.
-   Confirm an account from outside the institution cannot access tickets.
-3. Create a profile, edit its name/campus/student number, restart the app, and
+2. Sign in with a student `@vossie.net` Microsoft account and an ordinary staff
+   `@eduvos.com` account separately. Cancel the provider screen and retry.
+   Confirm outsiders cannot access tickets and ordinary staff cannot access
+   other requesters' tickets. Only an explicit support claim opens the shared queue.
+3. Create a profile, edit its name/campus/student or staff number, restart the app, and
    verify persistence. Delete its details and complete onboarding again.
 4. Create and edit a ticket. Post a reply, then verify it on another signed-in
    device. Confirm that support can assign and resolve it and its owner can

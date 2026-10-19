@@ -83,13 +83,13 @@ export default function SignUpScreen() {
             autoComplete="email"
             keyboardType="email-address"
             textContentType="emailAddress"
-            placeholder="you@eduvos.ac.za"
+            placeholder="studentnumber@vossie.net"
             error={submitted ? emailError : null}
             editable={!busy}
           />
 
           <TextField
-            label="Password"
+            label="Create an IT SUPPORT password"
             required
             value={password}
             onChangeText={setPassword}
@@ -97,7 +97,7 @@ export default function SignUpScreen() {
             autoCapitalize="none"
             autoComplete="new-password"
             textContentType="newPassword"
-            hint={`At least ${MIN_PASSWORD_LENGTH} characters.`}
+            hint={`At least ${MIN_PASSWORD_LENGTH} characters. Choose a separate password for this app.`}
             error={submitted ? passwordError : null}
             editable={!busy}
           />

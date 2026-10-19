@@ -3,6 +3,9 @@
 The application displays **IT SUPPORT**, uses a blue light/dark theme and bundles
 the official Eduvos wordmark and Android icon. Backend access uses native
 Firebase Authentication and Firestore; there is no runtime demo-data source.
+Client validation and rules accept student `@vossie.net` and staff `@eduvos.com`
+accounts. Ordinary staff retain requester permissions until an administrator
+grants a support claim. The domain changes have not been deployed to Firebase.
 
 ## Completed checks
 
@@ -10,8 +13,8 @@ Firebase Authentication and Firestore; there is no runtime demo-data source.
 | --- | --- |
 | Repeatable cloud install, including `npm ci` and dependency patch application | Passed |
 | TypeScript 6 type check | Passed |
-| Local authentication, SQLite, CRUD, sync and route regressions | 38 passed |
-| Firestore emulator authorization suite | 41 passed; no skipped tests |
+| Local authentication, SQLite, CRUD, sync and route regressions | 46 passed |
+| Firestore emulator authorization suite | 44 passed; no skipped tests |
 | Expo Doctor | 21 of 21 checks passed |
 | Android JavaScript/Hermes export | Passed |
 | Metro startup, Android manifest, JavaScript, official images and icon font requests | Passed |
@@ -53,4 +56,5 @@ assessed by the release owner before claiming production readiness.
 
 The cloud machine has Node 22.23.3, Java 21, Android SDK 36, Build Tools 36.0.0
 and NDK 27.1.12297006. It has no validated Android device/emulator connection;
-ADB's default preferences directory is outside the writable workspace.
+ADB runs successfully and reports no attached devices. Hardware virtualization
+is unavailable on this instance.

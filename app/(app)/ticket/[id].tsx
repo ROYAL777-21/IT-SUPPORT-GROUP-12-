@@ -125,7 +125,7 @@ export default function TicketDetailScreen() {
           style={{ gap: spacing.sm }}
         >
           <TextField
-            label={isSupport ? 'Reply to the student' : 'Add a message'}
+            label={isSupport ? 'Reply to the requester' : 'Add a message'}
             value={reply}
             onChangeText={setReply}
             multiline
@@ -176,7 +176,7 @@ export default function TicketDetailScreen() {
                   {ticket.location ? <Detail label="Where" value={ticket.location} /> : null}
                   <Detail label="Campus" value={ticket.campus || '—'} />
                   {isSupport ? (
-                    <Detail label="Student number" value={ticket.studentNumber || '—'} />
+                    <Detail label="Student or staff number" value={ticket.studentNumber || '—'} />
                   ) : null}
                   <Detail label="Logged" value={fullTimestamp(ticket.createdAt)} />
                   <Detail

@@ -1,6 +1,11 @@
 # IT SUPPORT
 
-An Android app for Eduvos students and IT support staff. Group 12 · IT Support.
+An Android app for Eduvos students and staff. Group 12 · IT Support.
+
+Students sign in with `studentnumber@vossie.net`; staff use `name@eduvos.com`.
+Microsoft uses their Eduvos credentials. Email/password registration creates a
+separate app password. Only designated IT support staff receive shared-queue
+permissions. Follow [the authentication setup steps](docs/AUTH.md) before rollout.
 
 Current verification results and outstanding release prerequisites are recorded
 in [docs/VALIDATION.md](docs/VALIDATION.md).

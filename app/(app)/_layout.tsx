@@ -22,7 +22,7 @@ export default function AppLayout() {
     >
       {/*
        * Onboarding is a route rather than a modal so it survives a reload with
-       * the same guard: a profile without a student number cannot reach the
+       * the same guard: a requester without an institutional number cannot reach the
        * tabs, and the ticket form can therefore assume it has one.
        */}
       <Stack.Protected guard={!verified}>

@@ -4,7 +4,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { getFirestoreDb } from '@/config/firebase';
 import { getDatabase } from '@/db/database';
-import { CAMPUSES, isPlausibleStudentNumber, type ProfileDraft, type Role, type UserProfile } from '@/models/user';
+import { CAMPUSES, isPlausibleInstitutionNumber, type ProfileDraft, type Role, type UserProfile } from '@/models/user';
 import { providerOf } from './authService';
 import { requireSession } from './session';
 
@@ -77,9 +77,9 @@ export async function updateProfileDetails(uid: string, draft: ProfileDraft): Pr
   if (!draft.displayName.trim() || draft.displayName.trim().length > 100) {
     throw new Error('Enter a name of between 1 and 100 characters.');
   }
-  if (existing.role === 'student' && (!isPlausibleStudentNumber(draft.studentNumber ?? '') ||
+  if (existing.role === 'student' && (!isPlausibleInstitutionNumber(draft.studentNumber ?? '') ||
     !CAMPUSES.includes(draft.campus as typeof CAMPUSES[number]))) {
-    throw new Error('Enter a valid student number and select your campus.');
+    throw new Error('Enter a valid student or staff number and select your campus.');
   }
   const profile = {
     ...existing, displayName: draft.displayName.trim(), studentNumber: draft.studentNumber?.trim() || undefined,

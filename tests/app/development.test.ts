@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getNative } from '../support/native';
 import { activateDatabase, deactivateDatabase, getDatabase, getSyncMeta } from '@/db/database';
-import { isInstitutionalEmail, signIn, signInWithMicrosoft, logOut } from '@/services/authService';
-import { ensureUserProfile, updateProfileDetails, deleteProfileDetails, getLocalProfile } from '@/services/profileService';
+import { isInstitutionalEmail, signIn, signInWithMicrosoft, logOut, getRole } from '@/services/authService';
+import { ensureUserProfile, updateProfileDetails, deleteProfileDetails, getLocalProfile, isProfileComplete } from '@/services/profileService';
 import { addComment, assignTicket, countPending, createTicket, deleteTicket, getTicket, listComments, listTicketsFor, updateTicketDetails, updateTicketStatus } from '@/services/ticketRepository';
 import { sync } from '@/services/syncService';
 import { generateReference, type NewTicketInput } from '@/models/ticket';
@@ -17,7 +17,7 @@ const input: NewTicketInput = {
   subject:'Cannot connect to Wi-Fi', description:'The connection fails in the library.',
 };
 function user(uid = 'student-1', support = false) {
-  return { uid, email: `${uid}@eduvos.ac.za`, emailVerified:true, displayName:'Test Student',
+  return { uid, email: `${uid}@vossie.net`, emailVerified:true, displayName:'Test Student',
     providerData:[{providerId:'password'}], support };
 }
 async function login(uid = 'student-1', support = false) {
@@ -36,19 +36,29 @@ beforeEach(async () => {
 });
 
 describe('identity and native authentication', () => {
-  it.each([' student@eduvos.ac.za ', 'STAFF@EDUVOS.COM'])('accepts the institutional address %s', (email) => {
+  it.each([' student@vossie.net ', 'STAFF@EDUVOS.COM'])('accepts the institutional address %s', (email) => {
     expect(isInstitutionalEmail(email)).toBe(true);
   });
-  it.each(['a@eduvos.com@evil.test','a@eduvos.com.evil.test','@eduvos.com','a b@eduvos.com','a@outlook.com'])('rejects %s', (email) => {
+  it.each(['a@eduvos.com@evil.test','a@eduvos.com.evil.test','@eduvos.com','a b@eduvos.com','a@outlook.com',
+    'a@eduvos.ac.za','a@vossie.net.evil.test','a@vossie.net@evil.test','a\tb@vossie.net'])('rejects %s', (email) => {
     expect(isInstitutionalEmail(email)).toBe(false);
   });
   it('rejects outsiders before sending a password to Firebase', async () => {
     await expect(signIn('a@outlook.com','password')).rejects.toThrow('Eduvos');
     expect(native.password).not.toHaveBeenCalled();
   });
-  it('uses the native Microsoft provider with the expected scopes', async () => {
+  it.each(['ST12345@VOSSIE.NET', 'STAFF@EDUVOS.COM'])('signs %s in using its registered app password', async (email) => {
+    native.user.email = email.toLowerCase();
+    native.password.mockResolvedValue({user:native.user});
+    expect((await signIn(` ${email} `, 'Separate app password')).email).toBe(email.toLowerCase());
+    expect(native.password).toHaveBeenCalledWith(expect.anything(),email.toLowerCase(),'Separate app password');
+    expect(await getRole(native.user)).toBe('student');
+  });
+  it.each(['ST12345@VOSSIE.NET', 'STAFF@EDUVOS.COM'])('uses native Microsoft sign-in for %s without granting support access', async (email) => {
+    native.user.email = email;
     native.popup.mockResolvedValue({user:native.user});
-    await signInWithMicrosoft();
+    expect((await signInWithMicrosoft()).email).toBe(email);
+    expect(await getRole(native.user)).toBe('student');
     const provider = native.popup.mock.calls[0][1];
     expect(provider.providerId).toBe('microsoft.com');
     expect(provider.scopes).toEqual(expect.arrayContaining(['openid','profile','email','offline_access','User.Read']));
@@ -77,6 +87,23 @@ describe('identity and native authentication', () => {
 });
 
 describe('account isolation and profile persistence', () => {
+  it('lets ordinary staff complete a profile and sync their own ticket without support privileges', async () => {
+    await login('staff-1');
+    native.user.email = 'lecturer@eduvos.com';
+    const role = await getRole(native.user);
+    expect(role).toBe('student');
+    await ensureUserProfile(native.user,role);
+    const profile = await updateProfileDetails(native.user.uid,{
+      displayName:'Staff Member',studentNumber:'42',campus:'Midrand',
+    });
+    expect(isProfileComplete(profile)).toBe(true);
+    const ticket = await createTicket({...input,studentNumber:'42'},native.user.uid);
+    await expect(assignTicket(ticket.id,{id:native.user.uid,name:profile.displayName})).rejects.toThrow('Only support');
+    await sync(native.user.uid,role);
+    expect(native.documents.get('users/staff-1')).toMatchObject({email:'lecturer@eduvos.com',studentNumber:'42'});
+    expect(native.documents.get(`tickets/${ticket.id}`)).toMatchObject({createdBy:'staff-1',studentNumber:'42',status:'open'});
+    expect(await countPending()).toBe(0);
+  });
   async function legacyCache() {
     const db = await openDatabaseAsync('campus-it-help.db');
     for (const migration of MIGRATIONS.filter((entry) => entry.version <= 2)) {
@@ -84,7 +111,7 @@ describe('account isolation and profile persistence', () => {
     }
     await db.execAsync('PRAGMA user_version = 2;');
     await db.runAsync(`INSERT INTO user_profiles (uid,email,display_name,student_number,campus,role,provider_id,created_at,updated_at)
-      VALUES (?,?,'Student','ST12345','Midrand','student','password',1,1);`, ['student-1','student-1@eduvos.ac.za']);
+      VALUES (?,?,'Student','ST12345','Midrand','student','password',1,1);`, ['student-1','student-1@vossie.net']);
     await db.runAsync(`INSERT INTO tickets (id,reference,student_number,campus,category,priority,status,subject,description,created_by,created_at,updated_at)
       VALUES ('legacy-ticket','EDU-LEGACY','ST12345','Midrand','wifi','medium','open','Saved offline ticket','Cannot connect','student-1',1,1);`);
     return db;
@@ -183,7 +210,7 @@ describe('tickets and synchronization', () => {
   });
   it('rejects invalid data before it enters the offline queue', async () => {
     await expect(createTicket({...input,subject:'x'},native.user.uid)).rejects.toThrow('title');
-    await expect(createTicket({...input,studentNumber:''},native.user.uid)).rejects.toThrow('student number');
+    await expect(createTicket({...input,studentNumber:''},native.user.uid)).rejects.toThrow('student or staff number');
     expect(await countPending()).toBe(0);
   });
   it('prevents students assigning tickets or marking them resolved', async () => {

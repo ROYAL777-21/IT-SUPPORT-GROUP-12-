@@ -15,7 +15,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { useSync } from '@/hooks/useSync';
 import { initialsOf, type AuthProviderId } from '@/models/user';
-import { providerOf, resendEmailVerification } from '@/services/authService';
+import { providerOf } from '@/services/authService';
 import { useTheme } from '@/theme';
 import { relativeTime } from '@/utils/format';
 
@@ -32,22 +32,6 @@ export default function ProfileScreen() {
   const { colors, spacing } = useTheme();
 
   const [notice, setNotice] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
-
-  const verified = user?.emailVerified ?? false;
-
-  async function resendVerification() {
-    setSending(true);
-    setNotice(null);
-    try {
-      await resendEmailVerification();
-      setNotice('Verification email sent. Check your inbox.');
-    } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : 'Could not send the email.');
-    } finally {
-      setSending(false);
-    }
-  }
 
   function confirmSignOut() {
     Alert.alert(
@@ -68,7 +52,7 @@ export default function ProfileScreen() {
 
   function confirmDeleteProfile() {
     Alert.alert('Delete profile details?',
-      'Your name, campus and student number will be removed from your profile. Your account and support tickets are retained. You will need to enter your details again to log tickets.', [
+      'Your name, campus and student or staff number will be removed from your profile. Your account and support tickets are retained. You will need to enter your details again to log tickets.', [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Delete details', style: 'destructive', onPress: () => {
           void deleteProfile().then(notifyLocalWrite).catch((cause) => setNotice(cause instanceof Error ? cause.message : 'Could not delete profile.'));
@@ -110,29 +94,6 @@ export default function ProfileScreen() {
           onRetry={() => void refresh()}
         />
 
-        {user && !verified && providerOf(user) === 'password' ? (
-          <Card>
-            <View style={{ gap: spacing.sm }}>
-              <View style={[styles.row, { gap: spacing.sm }]}>
-                <Ionicons name="alert-circle-outline" size={18} color={colors.warning} />
-                <Text variant="bodyStrong" style={{ color: colors.warning }}>
-                  Email not verified
-                </Text>
-              </View>
-              <Text variant="caption" tone="muted">
-                You can still log tickets. Verifying just confirms support is
-                talking to the right person.
-              </Text>
-              <Button
-                title="Resend verification email"
-                variant="secondary"
-                loading={sending}
-                onPress={() => void resendVerification()}
-              />
-            </View>
-          </Card>
-        ) : null}
-
         {notice ? (
           <Text variant="caption" tone="muted">
             {notice}
@@ -141,7 +102,7 @@ export default function ProfileScreen() {
 
         <Card flush>
           <ListItem
-            title="Student number"
+            title="Student or staff number"
             subtitle={profile?.studentNumber ?? 'Not set'}
             leading={<Ionicons name="card-outline" size={20} color={colors.textMuted} />}
           />

@@ -20,7 +20,7 @@ export const CATEGORY_LABELS: Record<TicketCategory, string> = {
   account: 'Login & Password',
   hardware: 'Hardware & Lab PCs',
   software: 'Software & Licences',
-  email: 'Student Email',
+  email: 'Eduvos Email',
   lms: 'Learning Portal',
   printing: 'Printing & Copy Credits',
   other: 'Something Else',

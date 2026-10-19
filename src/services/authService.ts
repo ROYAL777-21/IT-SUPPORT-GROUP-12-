@@ -28,7 +28,7 @@ import type { AuthProviderId, Role } from '@/models/user';
  * the enforcement: firestore.rules re-checks the same domains server-side,
  * because anything the client decides can be bypassed.
  */
-const ALLOWED_EMAIL_DOMAINS = ['eduvos.com', 'eduvos.ac.za'];
+const ALLOWED_EMAIL_DOMAINS = ['vossie.net', 'eduvos.com'];
 
 /**
  * Restricts "Continue with Microsoft" to one Entra ID tenant. Falling back to
@@ -39,10 +39,10 @@ const ALLOWED_EMAIL_DOMAINS = ['eduvos.com', 'eduvos.ac.za'];
 const AZURE_TENANT = process.env.EXPO_PUBLIC_AZURE_TENANT_ID || 'common';
 
 export function isInstitutionalEmail(email: string): boolean {
-  return /^[^\s@]+@(eduvos\.com|eduvos\.ac\.za)$/i.test(email.trim());
+  return /^[^\s@]+@(vossie\.net|eduvos\.com)$/i.test(email.trim());
 }
 
-/** For UI copy — "use your @eduvos.ac.za address". */
+/** Student and staff domains, also enforced in firestore.rules. */
 export const INSTITUTIONAL_DOMAINS = ALLOWED_EMAIL_DOMAINS;
 
 /**
@@ -75,7 +75,7 @@ const MESSAGES: Record<string, string> = {
   'auth/network-request-failed':
     'Could not reach Firebase. Check your connection — tickets you already have are still readable offline.',
   'auth/account-exists-with-different-credential':
-    'That email address is already registered with a password. Sign in with your password instead.',
+    'That email address is already registered. Sign in with your existing IT SUPPORT password.',
   'auth/cancelled-popup-request': 'Sign-in was cancelled.',
   'auth/popup-closed-by-user': 'Sign-in was cancelled.',
   'auth/web-context-cancelled': 'Sign-in was cancelled.',
@@ -130,7 +130,7 @@ export async function register(
   requireConfigured();
 
   if (!isInstitutionalEmail(email)) {
-    throw new AuthError('Please register with your Eduvos student email address.');
+    throw new AuthError('Please register with your Eduvos student or staff email address.');
   }
   if (password.length < 12) throw new AuthError('Choose a password of at least 12 characters.');
   if (!displayName.trim() || displayName.trim().length > 100) throw new AuthError('Enter your full name (up to 100 characters).');
@@ -199,7 +199,7 @@ export async function signInWithMicrosoft(): Promise<User> {
 
   const provider = new OAuthProvider('microsoft.com');
   // offline_access is what gets Firebase a refresh token, so the session
-  // survives past the first hour without bouncing the student back to login.
+  // survives past the first hour without requiring another sign-in.
   provider.addScope('openid');
   provider.addScope('profile');
   provider.addScope('email');
@@ -294,7 +294,7 @@ export async function refreshSession(): Promise<User | null> {
 /**
  * Reads the role from the ID token's custom claims.
  *
- * The claim is set from a trusted environment (see scripts/grant-support.ts),
+ * The claim is set from a trusted environment (see scripts/grant-support.mjs),
  * never by the app, and firestore.rules reads the same claim — so this is the
  * real authority on who is support, not the `role` field on the user document.
  *

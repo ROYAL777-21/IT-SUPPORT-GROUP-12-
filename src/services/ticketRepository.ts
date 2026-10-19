@@ -2,7 +2,7 @@ import { getDatabase } from '@/db/database';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { getCurrentUser, getRole } from './authService';
 import { requireSession } from './session';
-import { CAMPUSES, isPlausibleStudentNumber } from '@/models/user';
+import { CAMPUSES, isPlausibleInstitutionNumber } from '@/models/user';
 import {
   NewTicketInput,
   TICKET_STATUSES,
@@ -401,8 +401,8 @@ async function requireTicket(id: string) {
 }
 
 export function validateTicketInput(input: NewTicketInput): void {
-  if (!isPlausibleStudentNumber(input.studentNumber) || !CAMPUSES.includes(input.campus as typeof CAMPUSES[number])) {
-    throw new Error('Add a valid student number and campus to your profile first.');
+  if (!isPlausibleInstitutionNumber(input.studentNumber) || !CAMPUSES.includes(input.campus as typeof CAMPUSES[number])) {
+    throw new Error('Add a valid student or staff number and campus to your profile first.');
   }
   if (!TICKET_CATEGORIES.includes(input.category) || !TICKET_PRIORITIES.includes(input.priority)) {
     throw new Error('Select a valid category and priority.');

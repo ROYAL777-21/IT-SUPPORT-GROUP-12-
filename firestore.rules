@@ -5,7 +5,7 @@ service cloud.firestore {
       return request.auth != null
         && request.auth.token.email_verified == true
         && request.auth.token.email is string
-        && request.auth.token.email.lower().matches('[^@ ]+@(eduvos[.]com|eduvos[.]ac[.]za)$');
+        && request.auth.token.email.lower().matches('[^@\\s]+@(vossie[.]net|eduvos[.]com)$');
     }
     function support() {
       return institutional() && request.auth.token.get('support', false) == true;
@@ -20,7 +20,8 @@ service cloud.firestore {
       return d.keys().hasOnly(['id','reference','studentNumber','campus','category','priority','status',
         'subject','description','location','assignedTo','assignedToName','createdBy','createdAt','updatedAt','deleted','serverUpdatedAt'])
         && d.id == id && text(d.reference, 5, 50)
-        && text(d.studentNumber, 5, 20) && text(d.campus, 1, 100)
+        && text(d.studentNumber, 1, 20) && d.studentNumber.matches('[A-Za-z0-9-]+')
+        && text(d.campus, 1, 100)
         && d.category in ['wifi','account','hardware','software','email','lms','printing','other']
         && d.priority in ['low','medium','high','urgent']
         && d.status in ['open','in_progress','awaiting_student','resolved','closed']

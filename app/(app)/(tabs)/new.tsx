@@ -145,7 +145,7 @@ export default function NewTicketScreen() {
           ) : null}
 
           {role === 'support' ? <>
-            <TextField label="Student number" value={studentNumber} onChangeText={setStudentNumber} maxLength={20} required />
+            <TextField label="Student or staff number" value={studentNumber} onChangeText={setStudentNumber} maxLength={20} required />
             <Select label="Campus" value={campus} onChange={setCampus} required
               options={CAMPUSES.map((value) => ({value, label:value}))} />
           </> : null}

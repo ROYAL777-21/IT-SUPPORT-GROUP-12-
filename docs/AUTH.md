@@ -74,6 +74,39 @@ This app needs a development client or an APK; Expo Go lacks its Firebase module
 Microsoft documents [app registration](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app)
 and the [`organizations` audience](https://learn.microsoft.com/en-us/entra/identity-platform/v2-protocols-oidc#find-your-apps-openid-configuration-document-uri).
 
+## If Eduvos blocks app registration
+
+A school account cannot register an app when its directory administrator has
+disabled registration or withheld the required role. Downloading the Firebase
+Android configuration or installing the Firebase plugin does not grant Microsoft
+directory permissions.
+
+You have two supported routes:
+
+- Use an account in a separate Entra directory you control, where you have
+  permission to register applications. Follow the registration steps above.
+  Signing in with a different account is sufficient only if that account has
+  such a directory and permission. Eduvos may still require consent before
+  their student or staff accounts can use your registration.
+- Ask Eduvos IT to register the app on your behalf or approve your independently
+  owned registration. They do not need to grant you general administrator access.
+
+Information to give IT:
+
+> Application: IT SUPPORT, an Android help-desk app using Firebase Authentication.
+> Users: student accounts at vossie.net and staff accounts at eduvos.com.
+> Microsoft audience: accounts in any organizational directory.
+> Web callback: https://it-support-eduvos.firebaseapp.com/__/auth/handler
+> Delegated Microsoft Graph permission: User.Read, with standard sign-in scopes.
+> Please register or approve the application and provide its public client ID.
+> Enter its client-secret Value directly in the Firebase Microsoft provider
+> through an authorized project administrator.
+
+Email/password accounts can be tested independently while this approval is
+pending. They use an IT SUPPORT password and require email verification; they
+do not use or reset the institution's Microsoft password. Microsoft sign-in
+remains unavailable until an authorized registration is configured in Firebase.
+
 ## Firebase and Android
 
 1. Register package `za.ac.eduvos.campusithelp` in **it-support-eduvos** and download

@@ -13,7 +13,11 @@ an Entra client secret or service-account key in the app.
 
 ## Local build
 
-Install Node 22, Java 21, Android SDK 36, Build Tools 36.0.0 and NDK 27.1.12297006.
+Install Node 22, complete JDK 21 and JDK 17 installations, Android SDK 36,
+Build Tools 35.0.0/36.0.0 and NDK 27.1.12297006. Use JDK 21 for `JAVA_HOME`;
+React Native's Gradle plugins also need a Java 17 compiler. If Gradle does not
+discover both, set `org.gradle.java.installations.paths` to their absolute paths
+in your user Gradle properties. A Java runtime without `javac` is insufficient.
 
 ```sh
 npm ci

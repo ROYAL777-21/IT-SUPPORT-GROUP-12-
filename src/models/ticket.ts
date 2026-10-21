@@ -1,11 +1,6 @@
-/**
- * Domain model for the Campus IT Help ticketing app.
- *
- * The category list is drawn from the project brief. `support.js` from the
- * design mockups was meant to be the source of truth for it, but those files
- * were never added to the repo — if they arrive, reconcile against them here
- * and nowhere else.
- */
+import { uuid } from '@/utils/id';
+
+/** Domain model for campus support tickets. */
 
 export const TICKET_CATEGORIES = [
   'wifi',
@@ -25,7 +20,7 @@ export const CATEGORY_LABELS: Record<TicketCategory, string> = {
   account: 'Login & Password',
   hardware: 'Hardware & Lab PCs',
   software: 'Software & Licences',
-  email: 'Student Email',
+  email: 'Eduvos Email',
   lms: 'Learning Portal',
   printing: 'Printing & Copy Credits',
   other: 'Something Else',
@@ -140,10 +135,5 @@ export type NewTicketInput = Pick<
  * which would defeat the offline-first design.
  */
 export function generateReference(): string {
-  const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no I/L/O/0/1
-  let suffix = '';
-  for (let i = 0; i < 6; i += 1) {
-    suffix += alphabet[Math.floor(Math.random() * alphabet.length)];
-  }
-  return `EDU-${suffix}`;
+  return `EDU-${uuid().replace(/-/g, '').slice(0, 16).toUpperCase()}`;
 }

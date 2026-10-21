@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 
 import {
   Button,
+  EduvosLogo,
   MicrosoftButton,
   Screen,
   Text,
@@ -20,7 +21,7 @@ export default function SignInScreen() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ method: 'password' | 'microsoft'; message: string } | null>(null);
   // Which button is spinning. `busy` alone would spin both.
   const [method, setMethod] = useState<'password' | 'microsoft' | null>(null);
 
@@ -30,7 +31,7 @@ export default function SignInScreen() {
     try {
       if (method === 'password') {
         if (!email.trim() || !password) {
-          setError('Enter your email address and password.');
+          setError({method, message:'Enter your email address and password.'});
           return;
         }
         await signIn(email, password);
@@ -38,7 +39,7 @@ export default function SignInScreen() {
         await signInWithMicrosoft();
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Sign-in failed.');
+      setError({method, message:cause instanceof Error ? cause.message : 'Sign-in failed.'});
     } finally {
       setMethod(null);
     }
@@ -48,27 +49,51 @@ export default function SignInScreen() {
     <Screen scroll>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={{ paddingTop: spacing.xxxl, gap: spacing.xs }}>
-          <Text variant="display">Campus IT Help</Text>
+          <View style={{ marginBottom: spacing.lg }}><EduvosLogo /></View>
+          <Text variant="display">IT SUPPORT</Text>
           <Text tone="muted">
-            Log a support ticket and track it, on or off campus Wi-Fi.
+            Sign in with your Eduvos student or staff Microsoft account.
           </Text>
         </View>
 
-        <View style={{ marginTop: spacing.xxl, gap: spacing.lg }}>
+        <View style={{ marginTop: spacing.xl, gap: spacing.sm }}>
+          <MicrosoftButton
+            loading={method === 'microsoft'}
+            disabled={busy}
+            onPress={() => void attempt('microsoft')}
+          />
+          {error?.method === 'microsoft' ? (
+            <Text variant="caption" tone="danger">{error.message}</Text>
+          ) : null}
+          <Text variant="caption" tone="muted" center>
+            Students: studentnumber@vossie.net · Staff: name@eduvos.com
+          </Text>
+        </View>
+
+        <View style={[styles.separator, { marginVertical: spacing.xl, gap: spacing.md }]}>
+          <View style={[styles.rule, { backgroundColor: colors.border }]} />
+          <Text variant="caption" tone="faint">OR</Text>
+          <View style={[styles.rule, { backgroundColor: colors.border }]} />
+        </View>
+
+        <View style={{ gap: spacing.lg }}>
+          <Text variant="caption" tone="muted">
+            Already registered in IT SUPPORT? Use your app password below.
+          </Text>
           <TextField
-            label="Email address"
+            label="Eduvos email address"
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
             autoComplete="email"
             keyboardType="email-address"
             textContentType="emailAddress"
-            placeholder="you@eduvos.ac.za"
+            placeholder="studentnumber@vossie.net"
             editable={!busy}
           />
 
           <TextField
-            label="Password"
+            label="IT SUPPORT password"
             value={password}
             onChangeText={setPassword}
             secureTextEntry
@@ -78,9 +103,9 @@ export default function SignInScreen() {
             editable={!busy}
           />
 
-          {error ? (
+          {error?.method === 'password' ? (
             <Text variant="caption" tone="danger">
-              {error}
+              {error.message}
             </Text>
           ) : null}
 
@@ -92,32 +117,18 @@ export default function SignInScreen() {
           />
 
           <TextLink
-            label="Forgot your password?"
+            label="Forgot your app password?"
             align="center"
             onPress={() => router.push('/(auth)/forgot-password')}
           />
         </View>
-
-        <View style={[styles.separator, { marginVertical: spacing.xl, gap: spacing.md }]}>
-          <View style={[styles.rule, { backgroundColor: colors.border }]} />
-          <Text variant="caption" tone="faint">
-            OR
-          </Text>
-          <View style={[styles.rule, { backgroundColor: colors.border }]} />
-        </View>
-
-        <MicrosoftButton
-          loading={method === 'microsoft'}
-          disabled={busy}
-          onPress={() => void attempt('microsoft')}
-        />
 
         <View style={[styles.footer, { marginTop: spacing.xxl, gap: spacing.xs }]}>
           <Text variant="caption" tone="muted">
             No account yet?
           </Text>
           <TextLink
-            label="Register with your student email"
+            label="Register with Eduvos email"
             onPress={() => router.push('/(auth)/sign-up')}
           />
         </View>
@@ -129,5 +140,5 @@ export default function SignInScreen() {
 const styles = StyleSheet.create({
   separator: { flexDirection: 'row', alignItems: 'center' },
   rule: { flex: 1, height: StyleSheet.hairlineWidth },
-  footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  footer: { alignItems: 'center' },
 });

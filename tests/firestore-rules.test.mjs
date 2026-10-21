@@ -8,15 +8,16 @@ import {
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import {
-  addDoc,
   collection,
   deleteDoc,
   doc,
   getDoc,
   getDocs,
   query,
-  setDoc,
-  updateDoc,
+  setDoc as writeDocument,
+  updateDoc as updateDocument,
+  serverTimestamp,
+  writeBatch,
   where,
 } from 'firebase/firestore';
 
@@ -29,10 +30,23 @@ import {
  * and is trivially bypassed by anyone talking to Firestore directly.
  */
 
-const PROJECT_ID = 'campus-it-help-rules-test';
+const PROJECT_ID = 'demo-campus-it-help';
 
-const STUDENT = { sub: 'student-1', email: 'thandi@eduvos.ac.za', email_verified: true };
-const OTHER_STUDENT = { sub: 'student-2', email: 'sipho@eduvos.ac.za', email_verified: true };
+// Supply ordinary document IDs and server timestamps for authorization fixtures.
+function setDoc(ref, data) {
+  const fields = ref.parent.path === 'tickets'
+    ? { ...data, id: ref.id, serverUpdatedAt: serverTimestamp() }
+    : ref.parent.id === 'comments' ? { ...data, id: ref.id } : data;
+  return writeDocument(ref, fields);
+}
+function updateDoc(ref, fields) {
+  return updateDocument(ref, ref.parent.path === 'tickets'
+    ? { ...fields, serverUpdatedAt: serverTimestamp() } : fields);
+}
+
+const STUDENT = { sub: 'student-1', email: 'thandi@vossie.net', email_verified: true };
+const OTHER_STUDENT = { sub: 'student-2', email: 'sipho@vossie.net', email_verified: true };
+const STAFF = { sub: 'staff-1', email: 'lecturer@eduvos.com', email_verified: true };
 const OUTSIDER = { sub: 'outsider-1', email: 'someone@outlook.com', email_verified: true };
 const AGENT = { sub: 'agent-1', email: 'itdesk@eduvos.com', email_verified: true, support: true };
 
@@ -83,6 +97,20 @@ async function seedTicket(overrides = {}) {
 }
 
 describe('tickets', () => {
+  it('lets ordinary staff manage their own tickets without access to the support queue', async () => {
+    await seedTicket();
+    const db = testEnv.authenticatedContext(STAFF.sub, STAFF).firestore();
+    const ref = doc(db,'tickets','staff-ticket');
+    await assertSucceeds(setDoc(ref,ticketFor(STAFF.sub,{studentNumber:'42'})));
+    await assertSucceeds(getDoc(ref));
+    await assertSucceeds(updateDoc(ref,{subject:'Updated staff Wi-Fi issue'}));
+    await assertSucceeds(getDocs(query(collection(db,'tickets'),where('createdBy','==',STAFF.sub))));
+    await assertFails(getDoc(doc(db,'tickets','ticket-1')));
+    await assertFails(getDocs(collection(db,'tickets')));
+    await assertFails(updateDoc(ref,{assignedTo:STAFF.sub,assignedToName:'Lecturer'}));
+    await assertFails(updateDoc(ref,{status:'resolved'}));
+    await assertSucceeds(updateDoc(ref,{deleted:true}));
+  });
   it('lets a student create a ticket under their own uid', async () => {
     const db = testEnv.authenticatedContext(STUDENT.sub, STUDENT).firestore();
     await assertSucceeds(setDoc(doc(db, 'tickets', 'new-1'), ticketFor(STUDENT.sub)));
@@ -291,6 +319,16 @@ describe('user profiles', () => {
     );
   });
 
+  it('lets ordinary staff maintain their profile but not grant themselves support access', async () => {
+    const db = testEnv.authenticatedContext(STAFF.sub, STAFF).firestore();
+    const ref = doc(db,'users',STAFF.sub);
+    await assertSucceeds(setDoc(ref,profile(STAFF.sub,STAFF.email,{studentNumber:'42'})));
+    await assertSucceeds(getDoc(ref));
+    await assertSucceeds(updateDoc(ref,{displayName:'Updated Staff Name'}));
+    await assertFails(updateDoc(ref,{role:'support'}));
+    await assertSucceeds(deleteDoc(ref));
+  });
+
   it('stops a student granting themselves a role', async () => {
     const db = testEnv.authenticatedContext(STUDENT.sub, STUDENT).firestore();
     await assertFails(
@@ -335,5 +373,125 @@ describe('user profiles', () => {
     await assertFails(
       setDoc(doc(db, 'users', OUTSIDER.sub), profile(OUTSIDER.sub, OUTSIDER.email)),
     );
+  });
+});
+
+describe('release security regressions', () => {
+  it('rejects unapproved domains and lookalike student or staff addresses', async () => {
+    for (const email of ['a@eduvos.ac.za','a@vossie.net.evil.test','a@eduvos.com.evil.test',
+      'a@vossie.net@evil.test','a\tb@vossie.net','@vossie.net']) {
+      const db = testEnv.authenticatedContext(STUDENT.sub,{...STUDENT,email}).firestore();
+      await assertFails(setDoc(doc(db,'tickets','wrong-domain'),ticketFor(STUDENT.sub)));
+    }
+  });
+  it('allows an authenticated creator to check a missing ticket before uploading', async () => {
+    const db = testEnv.authenticatedContext(STUDENT.sub, STUDENT).firestore();
+    const snapshot = await assertSucceeds(getDoc(doc(db, 'tickets', 'not-yet-created')));
+    assert.equal(snapshot.exists(), false);
+    const anonymous = testEnv.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(anonymous, 'tickets', 'not-yet-created')));
+  });
+  it('lets support upload their own ticket after assigning it offline', async () => {
+    const db = testEnv.authenticatedContext(AGENT.sub, AGENT).firestore();
+    await assertSucceeds(setDoc(doc(db, 'tickets', 'offline-assignment'), ticketFor(AGENT.sub, {
+      status:'in_progress',assignedTo:AGENT.sub,assignedToName:'IT Desk',
+    })));
+  });
+  it('denies anonymous reads and writes', async () => {
+    await seedTicket();
+    const db = testEnv.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(db, 'tickets', 'ticket-1')));
+    await assertFails(setDoc(doc(db, 'tickets', 'anonymous'), ticketFor(STUDENT.sub)));
+  });
+  it('requires verified institutional email, including for support claims', async () => {
+    await seedTicket();
+    for (const claims of [
+      { ...STUDENT, email_verified: false },
+      { ...AGENT, email_verified: false },
+      { ...OUTSIDER, support: true },
+    ]) {
+      const db = testEnv.authenticatedContext(claims.sub, claims).firestore();
+      await assertFails(getDoc(doc(db, 'tickets', 'ticket-1')));
+      await assertFails(setDoc(doc(db, 'tickets', `unverified-${claims.sub}`), ticketFor(claims.sub)));
+    }
+  });
+  it('accepts uppercase institutional email addresses', async () => {
+    const db = testEnv.authenticatedContext(STUDENT.sub, { ...STUDENT, email: STUDENT.email.toUpperCase() }).firestore();
+    await assertSucceeds(setDoc(doc(db, 'tickets', 'uppercase-email'), ticketFor(STUDENT.sub)));
+  });
+  it('prevents students moving an open ticket to support-only statuses', async () => {
+    await seedTicket();
+    const db = testEnv.authenticatedContext(STUDENT.sub, STUDENT).firestore();
+    for (const status of ['in_progress', 'awaiting_student', 'resolved']) {
+      await assertFails(updateDoc(doc(db, 'tickets', 'ticket-1'), { status }));
+    }
+  });
+  it('rejects forged assignment labels on creation', async () => {
+    const db = testEnv.authenticatedContext(STUDENT.sub, STUDENT).firestore();
+    await assertFails(setDoc(doc(db, 'tickets', 'forged-label'), ticketFor(STUDENT.sub, { assignedToName: 'IT Desk' })));
+  });
+  it('rejects invalid statuses, empty content and unexpected fields', async () => {
+    const db = testEnv.authenticatedContext(STUDENT.sub, STUDENT).firestore();
+    for (const fields of [{ status: 'invented' }, { subject: '' }, { description: '' }, { priority: 'invented' },
+      { role: 'support' }, { studentNumber: '' }, { studentNumber: 'a'.repeat(21) }, { studentNumber: 'a b' }]) {
+      await assertFails(setDoc(doc(db, 'tickets', 'invalid-data'), ticketFor(STUDENT.sub, fields)));
+    }
+  });
+  it('rejects an ID that differs from the document path', async () => {
+    const db = testEnv.authenticatedContext(STUDENT.sub, STUDENT).firestore();
+    await assertFails(writeDocument(doc(db, 'tickets', 'wrong-id'), { ...ticketFor(STUDENT.sub), serverUpdatedAt: serverTimestamp() }));
+  });
+  it('requires server timestamps instead of client-controlled sync cursors', async () => {
+    const db = testEnv.authenticatedContext(STUDENT.sub, STUDENT).firestore();
+    await assertFails(writeDocument(doc(db, 'tickets', 'wrong-time'), { ...ticketFor(STUDENT.sub), id: 'wrong-time', serverUpdatedAt: 9999999999999 }));
+  });
+  it('propagates deletion as a tombstone and prevents resurrection', async () => {
+    await seedTicket();
+    const db = testEnv.authenticatedContext(STUDENT.sub, STUDENT).firestore();
+    await assertSucceeds(updateDoc(doc(db, 'tickets', 'ticket-1'), { deleted: true }));
+    await assertSucceeds(getDoc(doc(db, 'tickets', 'ticket-1')));
+    await assertFails(updateDoc(doc(db, 'tickets', 'ticket-1'), { deleted: false }));
+    await assertFails(deleteDoc(doc(db, 'tickets', 'ticket-1')));
+  });
+  it('allows an identical comment retry but never an edited retry', async () => {
+    await seedTicket();
+    const db = testEnv.authenticatedContext(STUDENT.sub, STUDENT).firestore();
+    const ref = doc(db, 'tickets', 'ticket-1', 'comments', 'retry');
+    const message = { id:'retry', ticketId:'ticket-1', authorId:STUDENT.sub, authorName:'Student',
+      fromSupport:false, body:'Still disconnected', createdAt:1_700_000_003_000 };
+    await assertSucceeds(setDoc(ref, message));
+    await assertSucceeds(setDoc(ref, message));
+    await assertFails(setDoc(ref, {...message, body:'Edited'}));
+  });
+  it('publishes a ticket and reply in one atomic batch', async () => {
+    const db = testEnv.authenticatedContext(STUDENT.sub, STUDENT).firestore();
+    const batch = writeBatch(db);
+    batch.set(doc(db,'tickets','atomic-ticket'), { ...ticketFor(STUDENT.sub), id:'atomic-ticket', serverUpdatedAt:serverTimestamp() });
+    batch.set(doc(db,'tickets','atomic-ticket','comments','atomic-comment'), {
+      id:'atomic-comment', ticketId:'atomic-ticket', authorId:STUDENT.sub, authorName:'Student',
+      fromSupport:false, body:'More information', createdAt:1_700_000_004_000,
+    });
+    await assertSucceeds(batch.commit());
+  });
+  it('refuses comments on closed tickets and misleading parent IDs', async () => {
+    await seedTicket({status:'closed'});
+    const db = testEnv.authenticatedContext(STUDENT.sub, STUDENT).firestore();
+    const message = {id:'closed-comment',ticketId:'ticket-1',authorId:STUDENT.sub,authorName:'Student',
+      fromSupport:false,body:'Reply',createdAt:1_700_000_005_000};
+    await assertFails(setDoc(doc(db,'tickets','ticket-1','comments','closed-comment'), message));
+    await seedTicket();
+    await assertFails(setDoc(doc(db,'tickets','ticket-1','comments','wrong-parent'), {...message,ticketId:'different-ticket'}));
+  });
+  it('allows a user to delete their own profile but not another account’s', async () => {
+    const db = testEnv.authenticatedContext(STUDENT.sub, STUDENT).firestore();
+    await assertSucceeds(deleteDoc(doc(db,'users',STUDENT.sub)));
+    await assertFails(deleteDoc(doc(db,'users',OTHER_STUDENT.sub)));
+  });
+  it('does not let users write another email address into their profile', async () => {
+    const db = testEnv.authenticatedContext(STUDENT.sub, STUDENT).firestore();
+    await assertFails(setDoc(doc(db,'users',STUDENT.sub), {
+      uid:STUDENT.sub,email:OTHER_STUDENT.email,displayName:'Student',studentNumber:'ST12345',campus:'Midrand',
+      providerId:'password',createdAt:1_700_000_000_000,updatedAt:1_700_000_000_000,
+    }));
   });
 });

@@ -1,4 +1,4 @@
-# Framework evaluation — Campus IT Help
+# Framework evaluation — IT SUPPORT
 
 Group 12 · IT Support
 
@@ -132,8 +132,8 @@ We still went with SQLite, for two reasons that outlast the SDK choice:
   cannot express it without either a denormalised sort key or client-side
   sorting of the whole collection.
 - **Explicit control.** We decide what is cached, when it syncs, and what
-  happens on sign-out (`resetDatabase()` wipes it, so the next person on a
-  shared phone reads nothing). Firestore's cache is a black box by comparison.
+  happens on sign-out (the account database is detached, keeping unsent work
+  private until that same account signs in again). Firestore's cache is a black box by comparison.
 
 The brief also lists SQLite as one of the tools to evaluate, and "offline-first
 ticketing" is the case it is genuinely built for.
@@ -143,7 +143,7 @@ ticketing" is the case it is genuinely built for.
 ## 4. How the chosen tools fit together
 
 ```
-   UI (React Native screens — from the Campus IT Help design)
+   UI (React Native screens — from the IT SUPPORT design)
         │  reads and writes, always local, never blocked on network
         ▼
    ticketRepository.ts ──────► SQLite (expo-sqlite)     ← source of truth for reads

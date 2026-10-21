@@ -1,22 +1,25 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, View } from 'react-native';
+import { useRouter } from 'expo-router';
 
 import { Button, Screen, Select, Text, TextField } from '@/components';
 import { useAuth } from '@/hooks/useAuth';
-import { CAMPUSES, isPlausibleStudentNumber } from '@/models/user';
+import { useSync } from '@/hooks/useSync';
+import { CAMPUSES, isPlausibleInstitutionNumber } from '@/models/user';
 import { useTheme } from '@/theme';
 
 const CAMPUS_OPTIONS = CAMPUSES.map((campus) => ({ value: campus, label: campus }));
 
 /**
- * Collects the two facts Firebase cannot tell us: which campus the student is
- * at and their student number.
+ * Collects the two facts Firebase cannot tell us: campus and student/staff number.
  *
  * Asking once here rather than on every ticket is the point. The (app) layout
  * guard means the ticket form can then assume both are present.
  */
-export default function OnboardingScreen() {
-  const { profile, saveProfile, role } = useAuth();
+export default function OnboardingScreen({ editing = false }: { editing?: boolean }) {
+  const { profile, saveProfile, role, signOut } = useAuth();
+  const { notifyLocalWrite } = useSync();
+  const router = useRouter();
   const { spacing } = useTheme();
 
   const [name, setName] = useState(profile?.displayName ?? '');
@@ -32,9 +35,9 @@ export default function OnboardingScreen() {
   const studentNumberError = isSupport
     ? null
     : !studentNumber.trim()
-      ? 'Enter your student number.'
-      : !isPlausibleStudentNumber(studentNumber)
-        ? 'That does not look like a student number.'
+      ? 'Enter your student or staff number.'
+      : !isPlausibleInstitutionNumber(studentNumber)
+        ? 'Use up to 20 letters, numbers or hyphens.'
         : null;
   const campusError = isSupport ? null : !campus ? 'Choose your campus.' : null;
 
@@ -53,6 +56,8 @@ export default function OnboardingScreen() {
         studentNumber: isSupport ? undefined : studentNumber,
         campus: isSupport ? undefined : (campus ?? undefined),
       });
+      notifyLocalWrite();
+      if (editing) router.back();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not save your details.');
     } finally {
@@ -65,7 +70,7 @@ export default function OnboardingScreen() {
       scroll
       footer={
         <Button
-          title="Continue"
+          title={editing ? 'Save changes' : 'Continue'}
           loading={saving}
           onPress={() => void submit()}
         />
@@ -73,10 +78,10 @@ export default function OnboardingScreen() {
     >
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={{ paddingTop: spacing.xxl, gap: spacing.xs }}>
-          <Text variant="title">A few details</Text>
+          <Text variant="title">{editing ? 'Your details' : 'A few details'}</Text>
           <Text tone="muted">
             {isSupport
-              ? 'Confirm how your name should appear to students on the tickets you pick up.'
+              ? 'Confirm how your name should appear to students and staff on their tickets.'
               : 'We ask once, so you never have to type them on a ticket again.'}
           </Text>
         </View>
@@ -88,6 +93,7 @@ export default function OnboardingScreen() {
             value={name}
             onChangeText={setName}
             autoCapitalize="words"
+            maxLength={100}
             error={submitted ? nameError : null}
             editable={!saving}
           />
@@ -95,12 +101,14 @@ export default function OnboardingScreen() {
           {!isSupport ? (
             <>
               <TextField
-                label="Student number"
+                label="Student or staff number"
                 required
                 value={studentNumber}
                 onChangeText={setStudentNumber}
                 autoCapitalize="characters"
                 autoCorrect={false}
+                maxLength={20}
+                hint="Use the number issued to you by Eduvos."
                 error={submitted ? studentNumberError : null}
                 editable={!saving}
               />
@@ -122,6 +130,8 @@ export default function OnboardingScreen() {
               {error}
             </Text>
           ) : null}
+          {!editing ? <Button title="Sign out" variant="ghost" disabled={saving}
+            onPress={() => void signOut().catch((cause) => setError(cause instanceof Error ? cause.message : 'Could not sign out.'))} /> : null}
         </View>
       </KeyboardAvoidingView>
     </Screen>

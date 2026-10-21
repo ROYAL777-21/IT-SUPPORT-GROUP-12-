@@ -23,7 +23,7 @@ type Filter = 'active' | 'all' | TicketStatus;
 export default function MyTicketsScreen() {
   const router = useRouter();
   const { profile } = useAuth();
-  const { pending, syncing, online, refresh } = useSync();
+  const { pending, syncing, online, lastError, refresh } = useSync();
   const { data: tickets, loading } = useMyTickets();
   const { spacing } = useTheme();
 
@@ -50,6 +50,7 @@ export default function MyTicketsScreen() {
 
         <SyncBanner
           pending={pending}
+          error={lastError}
           syncing={syncing}
           online={online}
           onRetry={() => void refresh()}

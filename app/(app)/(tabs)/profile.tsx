@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
 import {
   Button,
@@ -14,7 +15,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { useSync } from '@/hooks/useSync';
 import { initialsOf, type AuthProviderId } from '@/models/user';
-import { providerOf, resendEmailVerification } from '@/services/authService';
+import { providerOf } from '@/services/authService';
 import { useTheme } from '@/theme';
 import { relativeTime } from '@/utils/format';
 
@@ -25,45 +26,38 @@ const PROVIDER_LABELS: Record<AuthProviderId, string> = {
 };
 
 export default function ProfileScreen() {
-  const { user, profile, role, signOut } = useAuth();
-  const { pending, syncing, online, lastResult, refresh } = useSync();
+  const { user, profile, role, signOut, deleteProfile, refreshRole } = useAuth();
+  const { pending, syncing, online, lastResult, lastError, refresh, notifyLocalWrite } = useSync();
+  const router = useRouter();
   const { colors, spacing } = useTheme();
 
   const [notice, setNotice] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
-
-  const verified = user?.emailVerified ?? false;
-
-  async function resendVerification() {
-    setSending(true);
-    setNotice(null);
-    try {
-      await resendEmailVerification();
-      setNotice('Verification email sent. Check your inbox.');
-    } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : 'Could not send the email.');
-    } finally {
-      setSending(false);
-    }
-  }
 
   function confirmSignOut() {
     Alert.alert(
       'Sign out?',
-      // Worth spelling out: sign-out wipes the local cache, so anything that
-      // has not uploaded yet is genuinely gone, not just hidden.
       pending > 0
-        ? `You have ${pending} ${pending === 1 ? 'change' : 'changes'} that have not uploaded yet. Signing out will discard them.`
-        : 'Your tickets stay on the server. This device will clear its offline copy.',
+        ? `You have ${pending} changes waiting to upload. They stay on this device for your next sign-in.`
+        : 'Your saved data will be available when you sign in again.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Sign out',
           style: 'destructive',
-          onPress: () => void signOut(),
+          onPress: () => void signOut().catch((cause) => setNotice(cause instanceof Error ? cause.message : 'Could not sign out.')),
         },
       ],
     );
+  }
+
+  function confirmDeleteProfile() {
+    Alert.alert('Delete profile details?',
+      'Your name, campus and student or staff number will be removed from your profile. Your account and support tickets are retained. You will need to enter your details again to log tickets.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete details', style: 'destructive', onPress: () => {
+          void deleteProfile().then(notifyLocalWrite).catch((cause) => setNotice(cause instanceof Error ? cause.message : 'Could not delete profile.'));
+        } },
+      ]);
   }
 
   return (
@@ -96,31 +90,9 @@ export default function ProfileScreen() {
           pending={pending}
           syncing={syncing}
           online={online}
+          error={lastError}
           onRetry={() => void refresh()}
         />
-
-        {user && !verified && providerOf(user) === 'password' ? (
-          <Card>
-            <View style={{ gap: spacing.sm }}>
-              <View style={[styles.row, { gap: spacing.sm }]}>
-                <Ionicons name="alert-circle-outline" size={18} color={colors.warning} />
-                <Text variant="bodyStrong" style={{ color: colors.warning }}>
-                  Email not verified
-                </Text>
-              </View>
-              <Text variant="caption" tone="muted">
-                You can still log tickets. Verifying just confirms support is
-                talking to the right person.
-              </Text>
-              <Button
-                title="Resend verification email"
-                variant="secondary"
-                loading={sending}
-                onPress={() => void resendVerification()}
-              />
-            </View>
-          </Card>
-        ) : null}
 
         {notice ? (
           <Text variant="caption" tone="muted">
@@ -130,7 +102,7 @@ export default function ProfileScreen() {
 
         <Card flush>
           <ListItem
-            title="Student number"
+            title="Student or staff number"
             subtitle={profile?.studentNumber ?? 'Not set'}
             leading={<Ionicons name="card-outline" size={20} color={colors.textMuted} />}
           />
@@ -158,17 +130,23 @@ export default function ProfileScreen() {
                   ? 'Firebase is not configured on this build'
                   : pending > 0
                     ? `${pending} ${pending === 1 ? 'change' : 'changes'} waiting to upload`
-                    : 'Everything is up to date'
+                    : lastError ? 'Sync failed — tap to retry'
+                      : !online ? 'Offline — showing saved data'
+                        : lastResult ? 'Everything is up to date' : 'Waiting for first sync'
             }
             leading={<Ionicons name="sync-outline" size={20} color={colors.textMuted} />}
             onPress={() => void refresh()}
           />
         </Card>
 
+        <Button title="Edit profile" onPress={() => router.push('/(app)/edit-profile')} />
+        <Button title="Refresh account permissions" variant="secondary"
+          onPress={() => void refreshRole().catch((cause) => setNotice(cause instanceof Error ? cause.message : 'Could not refresh account.'))} />
+        <Button title="Delete profile details" variant="ghost" onPress={confirmDeleteProfile} />
         <Button title="Sign out" variant="secondary" onPress={confirmSignOut} />
 
         <Text variant="caption" tone="faint" center>
-          Campus IT Help · Group 12
+          IT SUPPORT · Group 12
           {profile?.updatedAt ? ` · profile updated ${relativeTime(profile.updatedAt)}` : ''}
         </Text>
       </View>

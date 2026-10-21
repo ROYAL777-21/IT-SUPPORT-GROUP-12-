@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import {
   FlatList,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
   View,
 } from 'react-native';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import {
@@ -26,6 +27,7 @@ import {
   CATEGORY_LABELS,
   STATUS_LABELS,
   allowedTransitions,
+  isClosed,
   type TicketComment,
   type TicketStatus,
 } from '@/models/ticket';
@@ -33,6 +35,7 @@ import { initialsOf } from '@/models/user';
 import {
   addComment,
   assignTicket,
+  deleteTicket,
   updateTicketStatus,
 } from '@/services/ticketRepository';
 import { useTheme } from '@/theme';
@@ -40,12 +43,13 @@ import { fullTimestamp, relativeTime } from '@/utils/format';
 
 export default function TicketDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const { user, profile, role } = useAuth();
   const { notifyLocalWrite } = useSync();
   const { colors, spacing } = useTheme();
 
-  const { data: ticket, loading } = useTicket(id);
-  const { data: comments } = useComments(id);
+  const { data: ticket, loading, error: loadError } = useTicket(id);
+  const { data: comments, error: commentError } = useComments(id);
 
   const [reply, setReply] = useState('');
   const [posting, setPosting] = useState(false);
@@ -69,7 +73,7 @@ export default function TicketDetailScreen() {
         <Stack.Screen options={{ title: 'Ticket' }} />
         <Text variant="heading">Ticket not found</Text>
         <Text tone="muted">
-          It may have been deleted, or it belongs to someone else.
+          {loadError ?? 'It may have been deleted, or it belongs to someone else.'}
         </Text>
       </Screen>
     );
@@ -121,7 +125,7 @@ export default function TicketDetailScreen() {
           style={{ gap: spacing.sm }}
         >
           <TextField
-            label={isSupport ? 'Reply to the student' : 'Add a message'}
+            label={isSupport ? 'Reply to the requester' : 'Add a message'}
             value={reply}
             onChangeText={setReply}
             multiline
@@ -130,13 +134,15 @@ export default function TicketDetailScreen() {
                 ? 'What you found, what you did, or what you need from them.'
                 : 'Anything else that might help support.'
             }
-            editable={!posting}
+            editable={!posting && !isClosed(ticket.status)}
+            maxLength={4000}
+            hint={isClosed(ticket.status) ? 'Reopen this ticket before replying.' : 'Up to 4000 characters.'}
             containerStyle={styles.replyField}
           />
           <Button
             title="Send"
             loading={posting}
-            disabled={!reply.trim()}
+            disabled={!reply.trim() || isClosed(ticket.status)}
             onPress={() => void postReply()}
           />
         </KeyboardAvoidingView>
@@ -170,7 +176,7 @@ export default function TicketDetailScreen() {
                   {ticket.location ? <Detail label="Where" value={ticket.location} /> : null}
                   <Detail label="Campus" value={ticket.campus || '—'} />
                   {isSupport ? (
-                    <Detail label="Student number" value={ticket.studentNumber || '—'} />
+                    <Detail label="Student or staff number" value={ticket.studentNumber || '—'} />
                   ) : null}
                   <Detail label="Logged" value={fullTimestamp(ticket.createdAt)} />
                   <Detail
@@ -180,6 +186,16 @@ export default function TicketDetailScreen() {
                 </View>
               </View>
             </Card>
+
+            {ticket.createdBy === user?.uid ? <Button title="Edit ticket" variant="secondary"
+              disabled={working} onPress={() => router.push(`/(app)/ticket/edit/${ticket.id}`)} /> : null}
+            <Button title="Delete ticket" variant="ghost" disabled={working} onPress={() => Alert.alert(
+              'Delete ticket?', 'This removes the ticket from active lists. A support record is retained for audit.', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Delete', style: 'destructive', onPress: () => void act(async () => {
+                  await deleteTicket(ticket.id); router.replace('/(app)/(tabs)');
+                }) },
+              ])} />
 
             {isSupport && user && profile ? (
               <Card>
@@ -240,9 +256,9 @@ export default function TicketDetailScreen() {
               </Card>
             ) : null}
 
-            {error ? (
+            {error || commentError ? (
               <Text variant="caption" tone="danger">
-                {error}
+                {error ?? commentError}
               </Text>
             ) : null}
 

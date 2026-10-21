@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -8,6 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { SyncProvider } from '@/hooks/useSync';
 import { ThemeProvider, useTheme } from '@/theme';
+import { Button, Screen, Text } from '@/components';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -34,8 +35,9 @@ export default function RootLayout() {
  * the persisted session resolves, which looks like being signed out.
  */
 function RootNavigator() {
-  const { initialising } = useAuth();
+  const { initialising, initialisationError, retrySession, signOut } = useAuth();
   const { colors, isDark } = useTheme();
+  const [signOutError, setSignOutError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!initialising) {
@@ -45,6 +47,18 @@ function RootNavigator() {
 
   if (initialising) {
     return null;
+  }
+  if (initialisationError) {
+    return <Screen>
+      <Text variant="heading">Could not load your account</Text>
+      <Text accessibilityRole="alert">{initialisationError}</Text>
+      {signOutError ? <Text accessibilityRole="alert" tone="danger">{signOutError}</Text> : null}
+      <Button title="Retry" onPress={() => void retrySession()} />
+      <Button title="Back to sign in" variant="secondary" onPress={() => {
+        setSignOutError(null);
+        void signOut().catch(() => setSignOutError('Could not sign out. Please retry.'));
+      }} />
+    </Screen>;
   }
 
   return (

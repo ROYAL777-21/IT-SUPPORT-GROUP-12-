@@ -1,49 +1,31 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { User } from '@react-native-firebase/auth';
 
+import { activateDatabase, deactivateDatabase } from '@/db/database';
 import {
-  getRole,
-  logOut as logOutService,
-  observeAuth,
-  signIn as signInService,
-  signInWithMicrosoft as signInWithMicrosoftService,
-  register as registerService,
+  getCurrentUser, getRole, isInstitutionalEmail, logOut, observeAuth, refreshSession,
+  signIn as signInService, signInWithMicrosoft as microsoftService, register as registerService,
 } from '@/services/authService';
-import {
-  ensureUserProfile,
-  isProfileComplete,
-  updateProfileDetails,
-} from '@/services/profileService';
+import { deleteProfileDetails, ensureUserProfile, isProfileComplete, updateProfileDetails } from '@/services/profileService';
 import type { ProfileDraft, Role, UserProfile } from '@/models/user';
 
 export interface AuthState {
-  /** Null once we know nobody is signed in; undefined means "still checking". */
   user: User | null;
   profile: UserProfile | null;
   role: Role;
-  /** True until the first auth state and profile load have settled. */
+  verified: boolean;
   initialising: boolean;
-  /** True while a sign-in the user triggered is in flight. */
+  initialisationError: string | null;
   busy: boolean;
-  /** False when onboarding still needs a student number and campus. */
   profileComplete: boolean;
-
   signIn: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, displayName: string) => Promise<void>;
   signInWithMicrosoft: () => Promise<void>;
   signOut: () => Promise<void>;
   saveProfile: (draft: ProfileDraft) => Promise<void>;
-  /** Re-reads the custom claim, e.g. after being granted support. */
+  deleteProfile: () => Promise<void>;
   refreshRole: () => Promise<void>;
+  retrySession: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -52,113 +34,96 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [role, setRole] = useState<Role>('student');
+  const [verified, setVerified] = useState(false);
   const [initialising, setInitialising] = useState(true);
+  const [initialisationError, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const generation = useRef(0);
+  const signingIn = useRef(false);
 
-  // Guards against a slow profile load for a signed-out-then-in user landing
-  // after the user has already changed.
-  const currentUid = useRef<string | null>(null);
-
-  useEffect(() => {
-    const unsubscribe = observeAuth((nextUser) => {
-      currentUid.current = nextUser?.uid ?? null;
-      setUser(nextUser);
-
-      if (!nextUser) {
-        setProfile(null);
-        setRole('student');
-        setInitialising(false);
+  const loadSession = useCallback(async (next: User | null) => {
+    const current = ++generation.current;
+    setInitialising(true);
+    setError(null);
+    setUser(null);
+    setProfile(null);
+    setRole('student');
+    setVerified(false);
+    try {
+      if (!next) {
+        deactivateDatabase();
         return;
       }
-
-      void (async () => {
-        try {
-          const nextRole = await getRole(nextUser);
-          const nextProfile = await ensureUserProfile(nextUser, nextRole);
-
-          if (currentUid.current !== nextUser.uid) {
-            return; // a different user signed in while we were loading
-          }
-          setRole(nextRole);
-          setProfile(nextProfile);
-        } finally {
-          if (currentUid.current === nextUser.uid) {
-            setInitialising(false);
-          }
-        }
-      })();
-    });
-
-    return unsubscribe;
-  }, []);
-
-  /**
-   * Runs a sign-in and leaves `busy` true on success. The auth listener above
-   * is what finishes the job — clearing busy here would flash the sign-in
-   * screen's idle state for the frame between success and navigation.
-   */
-  const runSignIn = useCallback(async (action: () => Promise<User>) => {
-    setBusy(true);
-    try {
-      await action();
-    } catch (error) {
-      setBusy(false);
-      throw error;
+      if (!isInstitutionalEmail(next.email ?? '')) {
+        await logOut();
+        throw new Error('Use an Eduvos account to sign in.');
+      }
+      // Do not expose protected routes until identity, claims and cache agree.
+      const nextRole = await getRole(next);
+      if (generation.current !== current) return;
+      await activateDatabase(next.uid);
+      const nextProfile = next.emailVerified ? await ensureUserProfile(next, nextRole) : null;
+      if (generation.current !== current || getCurrentUser()?.uid !== next.uid) return;
+      setUser(next);
+      setRole(nextRole);
+      setVerified(next.emailVerified);
+      setProfile(nextProfile);
+    } catch (cause) {
+      if (generation.current === current) {
+        setError(cause instanceof Error ? cause.message : 'Could not load your account. Please retry.');
+      }
+    } finally {
+      if (generation.current === current) setInitialising(false);
     }
   }, []);
 
   useEffect(() => {
-    if (user) {
+    const unsubscribe = observeAuth((next) => {
+      // Registration must finish setting the name before the profile is loaded.
+      if (!signingIn.current) void loadSession(next);
+    });
+    return () => { ++generation.current; unsubscribe(); };
+  }, [loadSession]);
+
+  const runSignIn = useCallback(async (action: () => Promise<User>) => {
+    if (signingIn.current) return;
+    signingIn.current = true;
+    setBusy(true);
+    try {
+      const next = await action();
+      await loadSession(next);
+    } finally {
+      signingIn.current = false;
       setBusy(false);
     }
-  }, [user]);
+  }, [loadSession]);
 
-  const value = useMemo<AuthState>(
-    () => ({
-      user,
-      profile,
-      role,
-      initialising,
-      busy,
-      profileComplete: isProfileComplete(profile),
-
-      signIn: (email, password) => runSignIn(() => signInService(email, password)),
-      register: (email, password, displayName) =>
-        runSignIn(() => registerService(email, password, displayName)),
-      signInWithMicrosoft: () => runSignIn(signInWithMicrosoftService),
-
-      signOut: async () => {
-        await logOutService();
-        setProfile(null);
-        setRole('student');
-      },
-
-      saveProfile: async (draft) => {
-        if (!user) {
-          throw new Error('You are not signed in.');
-        }
-        setProfile(await updateProfileDetails(user.uid, draft));
-      },
-
-      refreshRole: async () => {
-        if (!user) {
-          return;
-        }
-        const nextRole = await getRole(user, true);
-        setRole(nextRole);
-        setProfile(await ensureUserProfile(user, nextRole));
-      },
-    }),
-    [user, profile, role, initialising, busy, runSignIn],
-  );
+  const value = useMemo<AuthState>(() => ({
+    user, profile, role, verified, initialising, initialisationError, busy,
+    profileComplete: isProfileComplete(profile),
+    signIn: (email, password) => runSignIn(() => signInService(email, password)),
+    register: (email, password, name) => runSignIn(() => registerService(email, password, name)),
+    signInWithMicrosoft: () => runSignIn(microsoftService),
+    signOut: async () => { await logOut(); await loadSession(null); },
+    saveProfile: async (draft) => {
+      if (!user) throw new Error('Sign in to update your profile.');
+      const saved = await updateProfileDetails(user.uid, draft);
+      if (getCurrentUser()?.uid === user.uid) setProfile(saved);
+    },
+    deleteProfile: async () => {
+      if (!user) throw new Error('Sign in to delete your profile.');
+      const cleared = await deleteProfileDetails(user.uid);
+      if (getCurrentUser()?.uid === user.uid) setProfile(cleared);
+    },
+    refreshRole: async () => { await loadSession(await refreshSession()); },
+    retrySession: () => loadSession(getCurrentUser()),
+  }), [user, profile, role, verified, initialising, initialisationError, busy, runSignIn, loadSession]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthState {
   const state = useContext(AuthContext);
-  if (!state) {
-    throw new Error('useAuth() must be used inside <AuthProvider>.');
-  }
+  if (!state) throw new Error('useAuth() must be used inside <AuthProvider>.');
   return state;
 }

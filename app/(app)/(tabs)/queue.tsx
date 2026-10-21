@@ -33,7 +33,7 @@ const SCOPES: { value: Scope; label: string }[] = [
 export default function QueueScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const { pending, syncing, online, refresh } = useSync();
+  const { pending, syncing, online, lastError, refresh } = useSync();
   const { spacing } = useTheme();
 
   const [scope, setScope] = useState<Scope>('open');
@@ -74,6 +74,7 @@ export default function QueueScreen() {
 
         <SyncBanner
           pending={pending}
+          error={lastError}
           syncing={syncing}
           online={online}
           onRetry={() => void refresh()}

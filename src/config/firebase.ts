@@ -18,9 +18,8 @@ import { getFirestore, type Firestore } from '@react-native-firebase/firestore';
 
 /**
  * True when the native SDK found a valid config file and registered the default
- * app. The app is deliberately usable without it — SQLite alone backs the whole
- * UI — so a missing google-services.json degrades to "offline forever" rather
- * than crashing on launch.
+ * app. Authentication requires this configuration; release validation rejects
+ * builds without the real project configuration.
  */
 export const isFirebaseConfigured: boolean = getApps().length > 0;
 

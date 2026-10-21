@@ -1,172 +1,82 @@
-# Architecture — offline-first sync
+# Architecture
 
-## The constraint
+IT SUPPORT uses Expo Router for native screens, Firebase Authentication for
+identity, Firestore for shared records, and SQLite for each account's offline
+cache. Tickets and campus profiles are the two persistent CRUD modules.
 
-This is an app for reporting that campus IT is broken, and the single most
-common thing to report is that the Wi-Fi is down. So the app has to work
-*without* the network it exists to complain about. Any design where a screen
-waits on Firestore fails at exactly the moment the app matters.
+## Authentication and account storage
 
-## The shape
+The native Firebase SDK manages password and Microsoft sign-in and persists its
+session. Protected routes wait for the current identity, claims and local cache
+to load. Verified institutional accounts can access the backend. Unverified
+accounts see a verification screen with resend and refresh actions.
 
-```
-  Screens
-     │   read + write, synchronous, always local
-     ▼
-  ticketRepository.ts
-     │
-     ▼
-  SQLite  ◄──────────────┐   source of truth for everything the UI shows
-     │                   │
-     │ pending rows      │ pulled updates
-     ▼                   │
-  syncService.ts ────────┘
-     │
-     ▼
-  Firestore              shared source of truth across students + support
-```
+Each Firebase UID maps to its own SQLite filename using SHA-256. Signing out
+detaches that database; unsent work remains available when its owner returns.
+An older shared database is imported only if exactly one profile establishes
+ownership. Migrations and the import run in exclusive transactions.
 
-**One rule: the UI never touches Firestore.** It reads and writes SQLite, which
-is on local disk and effectively instant. Sync happens behind it.
+Support access comes from the Firebase ID-token claim, never from editable
+profile data. Repository reads also check role and ownership, including when a
+former support user still has other students' records in their private cache.
 
-## Write path
+## Local writes
 
-1. `createTicket()` inserts into SQLite with `sync_state = 'pending'` and
-   returns. The ticket is on screen immediately, online or not.
-2. Whenever `sync()` runs, pending rows are pushed to Firestore and flipped to
-   `'synced'`.
+Screens call repositories and read SQLite. Ticket IDs and references come from
+`expo-crypto`'s cryptographic random generator. A new ticket is immediately
+visible locally and marked pending. Edits record the changed fields and increase
+a version counter; replies and their parent notification share a transaction.
 
-Because the row id is a locally generated UUID and is reused as the Firestore
-document id, a ticket created offline keeps the same identity when it uploads.
-No id reconciliation, and the push is idempotent — a retry after a failure that
-actually succeeded just overwrites with identical data.
+Profile changes also enter a persistent queue. Deleting profile details removes
+the remote campus profile after synchronization without deleting the Firebase
+identity or the tickets. Ticket deletion records a tombstone, which hides the
+ticket from active lists and propagates its removal to other devices.
 
-The human-readable reference (`EDU-4F2A9C`) is random rather than sequential for
-the same reason: a sequential counter cannot be allocated offline without asking
-the server, which is the thing we cannot do.
+## Synchronization
 
-## Read path
+Synchronization runs after local edits, on sign-in, on foreground entry, when
+connectivity returns, on pull-to-refresh and every 30 seconds while mounted.
+Overlapping calls for the same account and role share a promise. Every run holds
+the original account's database connection and checks the active identity before
+remote operations, preventing an account switch from redirecting writes.
 
-Reads are plain SQL against local tables. Indexed on `(created_by, updated_at)`
-so the ticket list is ordered without a table scan.
+Pending profiles upload first, followed by tickets and replies. Existing tickets
+receive only fields edited locally, preserving unrelated support assignments.
+Replies and the parent's server timestamp upload in batches of at most 401
+writes. Identical comment retries are permitted; edited comments are rejected.
+A ticket's pending flag clears only if its version counter still matches the
+uploaded version, so an edit during upload stays queued. An existence check
+handles uploads committed before their local acknowledgement was saved.
 
-## Sync
+Pulls use Firestore `serverUpdatedAt`, independent of device clock skew. The
+cursor is separate for each role and includes ties using `>=`. Students query
+their own tickets; support queries the shared queue. Changed tickets bring their
+full comment thread. The cursor advances only after all local writes succeed.
+Locally edited fields are preserved until uploaded; unrelated server fields
+still refresh. A rejected ticket upload does not block other tickets or the
+remote pull, so a newly closed ticket can be reopened before retrying its reply.
+The live listener watches the
+most recent server timestamp and requests a sync; it does not render remote
+records directly.
 
-`sync()` pushes first, then pulls. That order matters — pushing first means the
-pull sees the rows we just published and will not treat them as conflicts.
+Legacy pending rows lack field-level history. Their values remain queued rather
+than being discarded. Server rules can reject a stale legacy status or assignment;
+verify any existing pending queue during an upgrade and resolve conflicts with
+the account owner before distributing the update.
 
-**Push.** Selects `sync_state = 'pending'`, writes each to Firestore with
-`setDoc(..., { merge: true })`, then clears the flag. The clear is conditional
-on `updated_at` still matching what was uploaded; if the student edited the row
-mid-upload, it stays pending so the newer edit is not lost.
+## Backend enforcement and validation
 
-Soft-deleted rows (`deleted = 1`) are deleted from Firestore and only then hard
--deleted locally, so a delete made offline still propagates.
+Firestore rules require verified institutional email, validate document fields,
+preserve ticket identity, restrict student status changes and reject unauthorized
+assignment or support claims. Profile documents cannot grant roles. Rules and
+indexes must be deployed together with the compatible app version.
 
-**Pull.** Queries only documents with `updatedAt > lastPulledAt`, so each sync
-transfers just what changed. The cursor lives in the `sync_meta` table. This
-keeps Firestore reads — and the free-tier quota — proportional to real activity
-rather than to collection size.
+Local tests use real in-memory SQLite with adapters for unavailable native APIs.
+Authorization tests run separately against Google's Firestore emulator using a
+`demo-` project. Neither suite supplies sample records to the shipped app. Live
+provider configuration, Android signing and device behavior require the checks
+in [RELEASE.md](RELEASE.md).
 
-The scope depends on who is asking. A student pulls `createdBy == uid`; a
-support agent pulls the whole collection, which is what makes the queue shared.
-`firestore.rules` enforces the same split, so a student device issuing the wide
-query is refused rather than trusted.
-
-**Comments are pulled too**, and this is the part that took a second pass to
-get right. Originally they were push-only: `pullRemote()` fetched tickets and
-nothing else, so a support agent's reply could upload and then never reach the
-student's device. The ticket lifecycle had no return path, which quietly made
-the whole thing a write-only log.
-
-The fix pulls each changed ticket's `comments` subcollection after the ticket
-pull. Scoping to *changed* tickets is what keeps it cheap, and it is only
-correct because `addComment()` touches its parent ticket's `updatedAt`. That
-touch looks like bookkeeping and is not: without it, a ticket with a new reply
-would never appear in the changed set, and the reply would never be fetched.
-
-Each pulled document is upserted with a guard:
-
-```sql
-WHERE tickets.sync_state = 'synced'
-  AND excluded.updated_at > tickets.updated_at
-```
-
-Two protections in one clause: never clobber a row with unpushed local edits,
-and never apply a stale remote version over a newer local one.
-
-## Conflict resolution
-
-Last-write-wins on `updatedAt`, with local pending edits winning until they are
-published.
-
-This is the right trade-off here because **conflicts are close to impossible in
-practice**: a ticket is edited by its author and by support staff, who touch
-different fields at different times, and the same student editing the same
-ticket from two devices at once is not a real scenario. Field-level merging
-would be significant extra complexity guarding against something that will not
-happen.
-
-The one genuine race — support resolving a ticket while the student edits it
-offline — resolves to whichever was written later. Comments are unaffected:
-they are separate append-only rows and never conflict.
-
-## Live updates
-
-`watchForChanges()` subscribes to Firestore and, when something moves, calls
-`sync()`. It never feeds the UI directly — screens still read SQLite alone, so
-the rule at the top of this document holds unchanged. All the listener does is
-replace "pull when the user swipes down" with "pull when there is something to
-pull", which is how a status change from support reaches a student who has no
-reason to think to refresh.
-
-The query is `orderBy('updatedAt', 'desc'), limit(1)`. We only need to know
-*that* something changed; an unbounded listener on a growing queue would bill
-for every document on every change. Snapshots with `hasPendingWrites` are
-ignored — that is the echo of our own push, and it is already local.
-
-## Concurrency
-
-`sync()` collapses overlapping calls into one in-flight promise. Without that, a
-launch sync and a pull-to-refresh could both push the same pending rows.
-
-Schema migrations run in `withExclusiveTransactionAsync`, not
-`withTransactionAsync`. The plain variant sweeps *any* query that happens to run
-while it is open into the transaction — including reads the UI kicks off at
-launch — and a half-applied schema is not something to leave to timing.
-
-## What is deliberately not here
-
-- **No attachments.** A screenshot of an error would mean Firebase Storage plus
-  a local file cache and an upload queue of its own. Worth adding; out of scope
-  for now.
-- **No push notifications.** A student finds out about a reply by opening the
-  app. Adding FCM is a self-contained next step.
-- **No web target.** `@react-native-firebase` is native-only by design, and
-  `expo-sqlite` needs extra setup in a browser. Supporting web would mean a
-  second data layer for a target nobody asked for.
-
-## Why the native SDK, not the JS SDK
-
-The Firebase JS SDK was the original choice and had to go: it cannot do
-Microsoft sign-in on React Native at all. The full reasoning is in
-[`AUTH.md`](AUTH.md).
-
-Two things improved as a side effect:
-
-- **Session persistence is free.** The web SDK needed `initializeAuth()` with
-  `getReactNativePersistence(AsyncStorage)` wired by hand, imported from
-  `@firebase/auth` rather than `firebase/auth` because the umbrella package
-  serves a browser bundle that genuinely does not contain that function. The
-  native SDK keeps the session in platform storage on its own.
-- **The typings stopped lying.** `tsconfig.json` used to map `@firebase/auth`
-  straight at `dist/rn/index.rn.d.ts`, because the package's `exports` map
-  lists the generic `"types"` key before `"react-native"` and conditional
-  exports match in declaration order — so tsc always landed on the browser
-  typings while Metro loaded the RN build. That mapping is gone.
-
-One typing gap remains, in the other direction: RNFirebase declares
-`providerId` private on its `OAuthProvider` class, so the class does not
-structurally satisfy the `AuthProvider` interface its own `signInWithPopup`
-asks for. The runtime object is exactly what the native bridge expects; only
-the declaration is wrong. `authService.ts` casts at the single call site.
+The current app supports Android development builds. It has no web target,
+attachments or push notifications. Replies become visible while the app is open
+or after its next foreground synchronization.

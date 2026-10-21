@@ -44,7 +44,7 @@ export default function ForgotPasswordScreen() {
           </Text>
           <Text tone="muted" center>
             If an account exists for {email.trim()}, a password reset link is on
-            its way. It expires in an hour.
+            its way. This resets your IT SUPPORT password.
           </Text>
           <Button
             title="Back to sign in"
@@ -60,9 +60,10 @@ export default function ForgotPasswordScreen() {
   return (
     <Screen scroll>
       <View style={{ paddingTop: spacing.xxl, gap: spacing.xs }}>
-        <Text variant="title">Reset your password</Text>
+        <Text variant="title">Reset your app password</Text>
         <Text tone="muted">
-          We will email you a link to set a new one.
+          We will email you a link to reset your IT SUPPORT password. For your
+          Microsoft password, use Eduvos's password recovery or contact the IT desk.
         </Text>
       </View>
 
@@ -75,7 +76,7 @@ export default function ForgotPasswordScreen() {
           autoComplete="email"
           keyboardType="email-address"
           textContentType="emailAddress"
-          placeholder="you@eduvos.ac.za"
+          placeholder="studentnumber@vossie.net"
           error={error}
           editable={!sending}
         />

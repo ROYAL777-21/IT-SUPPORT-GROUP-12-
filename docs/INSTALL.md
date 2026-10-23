@@ -1,5 +1,29 @@
 # Installing IT SUPPORT on Android
 
+## Internal test APK — 23 October 2026
+
+`IT-SUPPORT-arm64-test.apk` is a standalone internal test build for ARM64 phones
+running Android 7.0 or later. It is approximately 52 MB and includes its Hermes
+bundle; Expo Go, Metro and a development computer are not needed to open it.
+The app displays IT SUPPORT and uses the real `it-support-eduvos` Firebase
+Android configuration. See [VALIDATION.md](VALIDATION.md) for its source commit,
+checksum and completed package checks.
+
+1. Download the APK to your Android phone and open it from Downloads or a file manager.
+2. If Android requests it, allow installation from that source, then install
+   and open **IT SUPPORT**.
+3. Use an existing IT SUPPORT email/password account or register with a student
+   `@vossie.net` or staff `@eduvos.com` email. Create a separate app password
+   with at least 12 characters and verify the email before accessing tickets.
+4. Test sign-out, sign-in, password reset, profiles and tickets. Microsoft
+   sign-in still needs the registration/provider setup in [AUTH.md](AUTH.md).
+   An authorized Firebase account also needs to deploy the current rules and indexes.
+
+The APK uses a development signing certificate. Device launch and live sign-in
+remain unverified, and production distribution requires an owner-controlled
+signing key. Follow the signing and update guidance below before replacing
+an existing installation with pending offline changes.
+
 ## Required configuration
 
 Use Firebase project `it-support-eduvos` and Android package

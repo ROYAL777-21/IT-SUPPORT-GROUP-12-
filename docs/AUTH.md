@@ -14,8 +14,8 @@ exchange. No Microsoft client secret belongs in the app or its repository.
    `GOOGLE_SERVICES_JSON` to its absolute file path. This is the Android client
    configuration, not a service-account private key. It is ignored by Git.
 4. Keep Email/Password enabled in Authentication. Complete Microsoft's setup
-   below before building a release. Neither a Firebase project ID alone nor a
-   web-app configuration replaces the Android file.
+   below before validating Microsoft sign-in. Neither a Firebase project ID
+   alone nor a web-app configuration replaces the Android file.
 
 ## Register your own Microsoft app
 
@@ -181,10 +181,11 @@ After provider setup, rules deployment and APK installation, use real accounts:
    sign-out and sign-in again. Also test email registration, verification and
    app-password reset on both domains.
 
-No real student or staff Microsoft sign-in has been verified in this checkout;
-the app registration, provider settings and Android client configuration are
-still required. Source and rules tests do not validate Microsoft consent or
-credentials in Firebase.
+The supplied Android configuration is installed and an internal test APK was
+built on 23 October 2026. No real student or staff Microsoft sign-in has been
+verified; the app registration, provider settings, Firebase signing fingerprints
+and device acceptance checks remain required. Source and rules tests do not
+validate Microsoft consent or credentials in Firebase.
 
 ## Troubleshooting
 

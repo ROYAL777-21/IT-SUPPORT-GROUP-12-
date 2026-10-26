@@ -17,5 +17,7 @@ export function EduvosLogo() {
 
 const styles = StyleSheet.create({
   backing: { width: 272, maxWidth: '100%', padding: 16, borderRadius: 12, backgroundColor: '#ffffff' },
-  logo: { width: '100%', aspectRatio: 3019 / 1116 },
+  // Override both intrinsic image dimensions; aspectRatio alone retains the
+  // source bitmap's native height in React Native's Image layout.
+  logo: { width: '100%', height: 90 },
 });

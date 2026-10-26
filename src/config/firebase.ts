@@ -1,6 +1,6 @@
 import { getApps, type FirebaseApp } from '@react-native-firebase/app';
-import { getAuth, type Auth } from '@react-native-firebase/auth';
-import { getFirestore, type Firestore } from '@react-native-firebase/firestore';
+import { connectAuthEmulator, getAuth, type Auth } from '@react-native-firebase/auth';
+import { connectFirestoreEmulator, getFirestore, type Firestore } from '@react-native-firebase/firestore';
 
 /**
  * Firebase access for the native SDK (@react-native-firebase).
@@ -23,6 +23,13 @@ import { getFirestore, type Firestore } from '@react-native-firebase/firestore';
  */
 export const isFirebaseConfigured: boolean = getApps().length > 0;
 
+// Local integration testing requires an explicit development-build opt-in.
+// Release builds always use the configured Firebase services.
+const useLocalEmulators = typeof __DEV__ !== 'undefined' && __DEV__ &&
+  process.env.EXPO_PUBLIC_FIREBASE_EMULATORS === '1';
+let authEmulatorConnected = false;
+let firestoreEmulatorConnected = false;
+
 function requireApp(): FirebaseApp {
   const [app] = getApps();
   if (!app) {
@@ -34,9 +41,19 @@ function requireApp(): FirebaseApp {
 }
 
 export function getFirebaseAuth(): Auth {
-  return getAuth(requireApp());
+  const auth = getAuth(requireApp());
+  if (useLocalEmulators && !authEmulatorConnected) {
+    connectAuthEmulator(auth, 'http://127.0.0.1:9099');
+    authEmulatorConnected = true;
+  }
+  return auth;
 }
 
 export function getFirestoreDb(): Firestore {
-  return getFirestore(requireApp());
+  const firestore = getFirestore(requireApp());
+  if (useLocalEmulators && !firestoreEmulatorConnected) {
+    connectFirestoreEmulator(firestore, '127.0.0.1', 8080);
+    firestoreEmulatorConnected = true;
+  }
+  return firestore;
 }

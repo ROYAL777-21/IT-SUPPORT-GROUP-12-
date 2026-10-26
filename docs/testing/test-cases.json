@@ -1,0 +1,287 @@
+{
+  "version": 1,
+  "planned_on": "2026-10-26",
+  "application": "IT SUPPORT",
+  "cases": [
+    {
+      "id": "DEV-01",
+      "category": "Functional",
+      "feature": "Installation and launch",
+      "steps": "Install the x86_64 development APK on the Android emulator, start the bundled app through Metro, and inspect logcat.",
+      "expected": "IT SUPPORT opens to sign-in with Eduvos branding; no application crash."
+    },
+    {
+      "id": "AUTH-01",
+      "category": "Edge case",
+      "feature": "Blank sign-in",
+      "steps": "Submit the sign-in form with both fields empty.",
+      "expected": "A clear required-fields message appears; protected screens remain inaccessible."
+    },
+    {
+      "id": "AUTH-02",
+      "category": "Edge case",
+      "feature": "Institutional domains",
+      "steps": "Submit outsider and lookalike domains; then enter student and staff domain addresses.",
+      "expected": "Outsiders and lookalikes are rejected; vossie.net and eduvos.com pass domain validation."
+    },
+    {
+      "id": "AUTH-03",
+      "category": "Edge case",
+      "feature": "Blank registration",
+      "steps": "Open registration and submit all fields empty.",
+      "expected": "Name, institutional email and password requirements appear next to their inputs."
+    },
+    {
+      "id": "AUTH-04",
+      "category": "Edge case",
+      "feature": "Password validation",
+      "steps": "Submit a valid institutional email and a password shorter than 12 characters.",
+      "expected": "Registration is prevented with a minimum-length message."
+    },
+    {
+      "id": "AUTH-05",
+      "category": "Functional",
+      "feature": "Registration and verification gate",
+      "steps": "Register a synthetic student using the real native Auth SDK connected to the Auth emulator.",
+      "expected": "Account is created; verification screen prevents ticket access before verification."
+    },
+    {
+      "id": "AUTH-06",
+      "category": "Functional",
+      "feature": "Email verification",
+      "steps": "Resend verification, apply the local emulator action code, then check verification in the app.",
+      "expected": "Local verification action is generated; checking it opens onboarding after confirmation."
+    },
+    {
+      "id": "AUTH-07",
+      "category": "Functional",
+      "feature": "Student sign-in",
+      "steps": "Sign out, sign in with the verified local student account, then restart the app.",
+      "expected": "Sign-in succeeds and the session persists after restart."
+    },
+    {
+      "id": "AUTH-08",
+      "category": "Edge case",
+      "feature": "Incorrect password",
+      "steps": "Attempt sign-in with an existing student email and an incorrect app password.",
+      "expected": "An error appears and sign-in remains available for retry."
+    },
+    {
+      "id": "AUTH-09",
+      "category": "Functional",
+      "feature": "Sign-out and route protection",
+      "steps": "Sign out from Profile, confirm the dialog, then press Android Back and relaunch.",
+      "expected": "Sign-in is shown; previous protected screens cannot be reopened."
+    },
+    {
+      "id": "AUTH-10",
+      "category": "Functional and edge case",
+      "feature": "Password reset",
+      "steps": "Reject an invalid reset address; request a reset for a local verified account and apply the local action code.",
+      "expected": "Invalid email is rejected; a local reset action is generated; the new app password can sign in."
+    },
+    {
+      "id": "AUTH-11",
+      "category": "Functional",
+      "feature": "Ordinary staff account",
+      "steps": "Sign in with a verified local eduvos.com account without a support claim.",
+      "expected": "Staff can maintain their own profile and tickets; the shared queue stays unavailable."
+    },
+    {
+      "id": "MS-01",
+      "category": "External integration",
+      "feature": "Live student Microsoft sign-in",
+      "steps": "Use an approved Entra registration and a real vossie.net Microsoft account on a physical phone.",
+      "expected": "Organizational sign-in, consent/MFA and callback complete; the correct institutional identity opens the app."
+    },
+    {
+      "id": "MS-02",
+      "category": "External integration",
+      "feature": "Live staff Microsoft sign-in",
+      "steps": "Repeat organizational sign-in with a real eduvos.com staff account; cancel once and retry.",
+      "expected": "Cancellation is recoverable; successful sign-in does not grant support without a custom claim."
+    },
+    {
+      "id": "PROF-01",
+      "category": "Edge case",
+      "feature": "Onboarding validation",
+      "steps": "Submit missing campus/number and an invalid institution number.",
+      "expected": "Missing or invalid details are rejected with clear messages."
+    },
+    {
+      "id": "PROF-02",
+      "category": "Functional",
+      "feature": "Profile create and read",
+      "steps": "Complete student name, institution number and campus; view Profile and inspect the local Firestore emulator record.",
+      "expected": "Details appear correctly and persist locally and in the test backend."
+    },
+    {
+      "id": "PROF-03",
+      "category": "Functional",
+      "feature": "Profile update",
+      "steps": "Edit name and campus, save, restart and view Profile again.",
+      "expected": "Updated details remain after restart and synchronize to the test backend."
+    },
+    {
+      "id": "PROF-04",
+      "category": "Functional",
+      "feature": "Profile delete",
+      "steps": "Cancel deletion once, then delete profile details and complete onboarding again.",
+      "expected": "Cancel preserves details; confirmed deletion clears profile details while retaining identity and ticket history."
+    },
+    {
+      "id": "TKT-01",
+      "category": "Edge case",
+      "feature": "Required ticket fields",
+      "steps": "Submit an empty new-ticket form, then a title shorter than five characters.",
+      "expected": "Required category/title/description feedback appears; invalid tickets are not stored."
+    },
+    {
+      "id": "TKT-02",
+      "category": "Functional",
+      "feature": "Ticket create and read",
+      "steps": "Choose category and priority, enter title/description/location and log the ticket.",
+      "expected": "A unique reference and matching details appear; the ticket reaches the test backend."
+    },
+    {
+      "id": "TKT-03",
+      "category": "Functional",
+      "feature": "Ticket edit",
+      "steps": "Open Edit, change title, description and location, save and reopen.",
+      "expected": "Changed values persist and appear in the test backend."
+    },
+    {
+      "id": "TKT-04",
+      "category": "Functional",
+      "feature": "Ticket comments",
+      "steps": "Post a reply, reopen the ticket and inspect its comment collection.",
+      "expected": "Reply appears once with author information and is persisted in the test backend."
+    },
+    {
+      "id": "TKT-05",
+      "category": "Functional",
+      "feature": "Close and reopen",
+      "steps": "Close an owned ticket, then reopen it.",
+      "expected": "Status changes are visible and persisted, with appropriate available actions."
+    },
+    {
+      "id": "TKT-06",
+      "category": "Functional",
+      "feature": "Ticket filters",
+      "steps": "Create a second ticket and use available status filters.",
+      "expected": "Matching tickets are shown and the empty result state is clear."
+    },
+    {
+      "id": "TKT-07",
+      "category": "Functional",
+      "feature": "Ticket delete",
+      "steps": "Cancel deletion once; then confirm deletion of one ticket.",
+      "expected": "Cancel preserves it; confirmed deletion removes it from the requester list and stores a tombstone."
+    },
+    {
+      "id": "SUP-01",
+      "category": "Functional and security",
+      "feature": "Support queue and assignment",
+      "steps": "Sign in with a locally granted support claim, open Queue and assign an existing ticket.",
+      "expected": "The shared queue opens only for support; assignment is persisted."
+    },
+    {
+      "id": "SUP-02",
+      "category": "Functional",
+      "feature": "Support resolution",
+      "steps": "Resolve a ticket as support and sign back into its owner account.",
+      "expected": "The owner sees the resolved status and support update."
+    },
+    {
+      "id": "SEC-01",
+      "category": "Functional and security",
+      "feature": "Account isolation",
+      "steps": "Switch between student and ordinary staff accounts with separate tickets.",
+      "expected": "Neither account sees the other account cache or requester tickets."
+    },
+    {
+      "id": "SEC-02",
+      "category": "Security",
+      "feature": "Backend ownership enforcement",
+      "steps": "Attempt a cross-owner Firestore read with the ordinary staff emulator ID token.",
+      "expected": "The actual Firestore emulator rules deny access."
+    },
+    {
+      "id": "OFF-01",
+      "category": "Edge case",
+      "feature": "Offline reads",
+      "steps": "After successful sync, disable Android Wi-Fi/data and open saved ticket details.",
+      "expected": "Cached tickets and comments remain readable with offline feedback."
+    },
+    {
+      "id": "OFF-02",
+      "category": "Edge case",
+      "feature": "Offline writes and restart",
+      "steps": "Create a ticket and reply while offline; force-stop and reopen the app.",
+      "expected": "Unsent work survives restart and pending state remains visible."
+    },
+    {
+      "id": "OFF-03",
+      "category": "Functional recovery",
+      "feature": "Reconnect and retry",
+      "steps": "Restore Android connectivity and trigger sync; inspect the test backend twice.",
+      "expected": "Queued changes upload once without duplicate replies; pending count clears."
+    },
+    {
+      "id": "UX-01",
+      "category": "Usability",
+      "feature": "Navigation and back stack",
+      "steps": "Visit each implemented screen and use Android Back through edit/detail/auth flows.",
+      "expected": "Navigation is understandable and Back returns safely without exposing protected routes."
+    },
+    {
+      "id": "UX-02",
+      "category": "Usability",
+      "feature": "Keyboard and scrolling",
+      "steps": "Focus long-form fields, scroll to actions and submit on the emulator screen.",
+      "expected": "Inputs remain editable and actions can be reached while using the keyboard."
+    },
+    {
+      "id": "UX-03",
+      "category": "Usability",
+      "feature": "Dark theme",
+      "steps": "Switch Android to dark mode and inspect sign-in, list and detail screens.",
+      "expected": "Blue branding, text, controls and feedback remain readable."
+    },
+    {
+      "id": "UX-04",
+      "category": "Usability",
+      "feature": "Large text",
+      "steps": "Set Android font scale to 1.3, inspect key forms and return to normal.",
+      "expected": "Content can be read and actions reached without a crash or inaccessible form."
+    },
+    {
+      "id": "UX-05",
+      "category": "Usability",
+      "feature": "Accessible input labels",
+      "steps": "Inspect UI Automator labels and activate major form/navigation controls.",
+      "expected": "Inputs and main actions have meaningful labels and respond to user actions; no TalkBack user study is implied."
+    },
+    {
+      "id": "ERR-01",
+      "category": "Edge case",
+      "feature": "Network sign-in failure",
+      "steps": "Attempt sign-in while the device has no network, then restore connectivity and retry.",
+      "expected": "Failure is understandable and recoverable; the app remains usable."
+    },
+    {
+      "id": "STAB-01",
+      "category": "Stability",
+      "feature": "Repeated use and crash review",
+      "steps": "Restart the app and repeat major tab/detail transitions; inspect package-specific crash/ANR evidence.",
+      "expected": "The executed sequence completes without an unresolved application crash or ANR."
+    },
+    {
+      "id": "APK-01",
+      "category": "Packaging",
+      "feature": "Android transfer artifact",
+      "steps": "Verify the ARM64 APK signature, checksum, name, ABI, SDK levels and transfer ZIP integrity.",
+      "expected": "APK is signed, self-contained and packaged with accurate Android installation/WhatsApp instructions."
+    }
+  ]
+}

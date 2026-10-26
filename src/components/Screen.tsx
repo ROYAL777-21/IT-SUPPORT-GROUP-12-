@@ -25,7 +25,7 @@ export function Screen({
   children,
   scroll = false,
   padded = true,
-  edges = ['top', 'left', 'right'],
+  edges = ['top', 'left', 'right', 'bottom'],
   contentContainerStyle,
   footer,
 }: ScreenProps) {

@@ -17,7 +17,7 @@ const config: ExpoConfig = {
   name: 'IT SUPPORT',
   icon: './assets/branding/eduvos-icon.png',
   slug: 'campus-it-help',
-  version: '0.1.0',
+  version: '0.1.1',
   orientation: 'portrait',
   userInterfaceStyle: 'automatic',
   // Required for the OAuth redirect back into the app after Microsoft sign-in.
@@ -29,6 +29,7 @@ const config: ExpoConfig = {
   },
   android: {
     package: 'za.ac.eduvos.campusithelp',
+    versionCode: 2,
     allowBackup: false,
     googleServicesFile: existsSync(GOOGLE_SERVICES_JSON) ? GOOGLE_SERVICES_JSON : undefined,
   },

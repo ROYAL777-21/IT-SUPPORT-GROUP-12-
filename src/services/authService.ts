@@ -27,7 +27,7 @@ import type { AuthProviderId, Role } from '@/models/user';
  * the enforcement: firestore.rules re-checks the same domains server-side,
  * because anything the client decides can be bypassed.
  */
-const ALLOWED_EMAIL_DOMAINS = ['eduvos.com', 'eduvos.ac.za'];
+const ALLOWED_EMAIL_DOMAINS = ['eduvos.com', 'vossie.net'];
 
 /**
  * Restricts "Continue with Microsoft" to one Entra ID tenant. Falling back to
@@ -42,7 +42,7 @@ export function isInstitutionalEmail(email: string): boolean {
   return Boolean(domain) && ALLOWED_EMAIL_DOMAINS.includes(domain);
 }
 
-/** For UI copy — "use your @eduvos.ac.za address". */
+/** For UI copy — "use your @eduvos.com or @vossie.net address". */
 export const INSTITUTIONAL_DOMAINS = ALLOWED_EMAIL_DOMAINS;
 
 /**

@@ -75,7 +75,7 @@ export default function ForgotPasswordScreen() {
           autoComplete="email"
           keyboardType="email-address"
           textContentType="emailAddress"
-          placeholder="you@eduvos.ac.za"
+          placeholder="you@eduvos.com"
           error={error}
           editable={!sending}
         />

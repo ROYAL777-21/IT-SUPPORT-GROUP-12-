@@ -31,8 +31,8 @@ import {
 
 const PROJECT_ID = 'campus-it-help-rules-test';
 
-const STUDENT = { sub: 'student-1', email: 'thandi@eduvos.ac.za', email_verified: true };
-const OTHER_STUDENT = { sub: 'student-2', email: 'sipho@eduvos.ac.za', email_verified: true };
+const STUDENT = { sub: 'student-1', email: 'thandi@vossie.net', email_verified: true };
+const OTHER_STUDENT = { sub: 'student-2', email: 'sipho@vossie.net', email_verified: true };
 const OUTSIDER = { sub: 'outsider-1', email: 'someone@outlook.com', email_verified: true };
 const AGENT = { sub: 'agent-1', email: 'itdesk@eduvos.com', email_verified: true, support: true };
 

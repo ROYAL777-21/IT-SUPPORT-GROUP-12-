@@ -19,7 +19,7 @@ service cloud.firestore {
     // cleanup is bypassed.
     function isInstitutionalEmail() {
       return isSignedIn()
-        && request.auth.token.email.matches('.*@(eduvos[.]com|eduvos[.]ac[.]za)$');
+        && request.auth.token.email.matches('.*@(eduvos[.]com|vossie[.]net)$');
     }
 
     // Support agents are marked with a custom claim set from a trusted

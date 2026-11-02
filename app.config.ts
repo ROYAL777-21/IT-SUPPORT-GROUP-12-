@@ -17,6 +17,7 @@ const config: ExpoConfig = {
   slug: 'campus-it-help',
   version: '0.1.0',
   orientation: 'portrait',
+  jsEngine: 'jsc',
   userInterfaceStyle: 'automatic',
   // Required for the OAuth redirect back into the app after Microsoft sign-in.
   scheme: 'campusithelp',

@@ -8,41 +8,44 @@
  * this one file rather than hunting hex codes through the screens.
  */
 
-/** Eduvos brand red, and the ramp derived from it. */
+/**
+ * Brand navy, taken from the Deliverable 3 screen wireframes (`--navy`,
+ * `--navy-soft`), and the ramp derived from it. Matches the Eduvos logo.
+ */
 const BRAND = {
-  50: '#fdecec',
-  100: '#f9c9c9',
-  200: '#f19d9d',
-  300: '#e77070',
-  400: '#dc4b4b',
-  500: '#c8102e', // primary
-  600: '#a80d27',
-  700: '#870a1f',
-  800: '#660718',
-  900: '#450410',
+  50: '#e6edf4', // wireframe --navy-soft
+  100: '#c9d8e6', // wireframe own-bubble border
+  200: '#9db7d0',
+  300: '#6d92b6',
+  400: '#4a75a0',
+  500: '#1b3a5c', // primary (wireframe --navy)
+  600: '#152f4b',
+  700: '#10243a',
+  800: '#0b1a2a',
+  900: '#07111c',
 } as const;
 
 const NEUTRAL = {
-  0: '#ffffff',
-  50: '#f7f8fa',
-  100: '#eef0f4',
-  200: '#dfe3e9',
-  300: '#c5ccd6',
-  400: '#98a2b3',
-  500: '#6b7280',
-  600: '#4b5563',
-  700: '#333a45',
-  800: '#20252d',
-  900: '#14181e',
-  950: '#0b0e12',
+  0: '#ffffff', // wireframe --paper
+  50: '#f2f4f6', // wireframe --page
+  100: '#e8edf1', // wireframe --rule-2
+  200: '#d3dae1', // wireframe --rule
+  300: '#b4bfca',
+  400: '#8494a4', // wireframe --ink-3
+  500: '#64748a',
+  600: '#4a5a6a', // wireframe --ink-2
+  700: '#334250',
+  800: '#222e3a',
+  900: '#16202b', // wireframe --ink
+  950: '#0b1219',
 } as const;
 
 /** Semantic hues. Each has a `fg` for text/icons and a `bg` for tinted fills. */
 const SIGNAL = {
-  info: { light: '#1d4ed8', dark: '#93b4ff' },
-  success: { light: '#15803d', dark: '#6ee7a8' },
-  warning: { light: '#b45309', dark: '#fcd34d' },
-  danger: { light: '#b3261e', dark: '#ff9c94' },
+  info: { light: '#1b3a5c', dark: '#9db7d0' },
+  success: { light: '#1f6844', dark: '#6ee7a8' }, // wireframe --green
+  warning: { light: '#8a6416', dark: '#fcd34d' }, // wireframe --amber
+  danger: { light: '#aa3333', dark: '#ff9c94' }, // wireframe error red
 } as const;
 
 export interface ColorScheme {
@@ -97,15 +100,15 @@ export const lightColors: ColorScheme = {
   primaryTint: BRAND[50],
 
   info: SIGNAL.info.light,
-  infoTint: '#e8efff',
+  infoTint: '#e6edf4',
   success: SIGNAL.success.light,
-  successTint: '#e6f6ec',
+  successTint: '#e2f0e8',
   warning: SIGNAL.warning.light,
-  warningTint: '#fdf1e0',
+  warningTint: '#fbf1dc',
   danger: SIGNAL.danger.light,
-  dangerTint: '#fdeceb',
+  dangerTint: '#f8e8e8',
 
-  scrim: 'rgba(11, 14, 18, 0.45)',
+  scrim: 'rgba(22, 32, 43, 0.45)',
   microsoft: '#2f6fed',
 };
 
@@ -113,8 +116,8 @@ export const darkColors: ColorScheme = {
   background: NEUTRAL[950],
   surface: NEUTRAL[900],
   surfaceAlt: NEUTRAL[800],
-  border: '#252b34',
-  borderStrong: '#39414d',
+  border: '#26323f',
+  borderStrong: '#3b4958',
 
   text: NEUTRAL[50],
   textMuted: NEUTRAL[400],
@@ -123,10 +126,10 @@ export const darkColors: ColorScheme = {
 
   primary: BRAND[400],
   primaryPressed: BRAND[300],
-  primaryTint: 'rgba(220, 75, 75, 0.16)',
+  primaryTint: 'rgba(74, 117, 160, 0.22)',
 
   info: SIGNAL.info.dark,
-  infoTint: 'rgba(147, 180, 255, 0.14)',
+  infoTint: 'rgba(157, 183, 208, 0.14)',
   success: SIGNAL.success.dark,
   successTint: 'rgba(110, 231, 168, 0.14)',
   warning: SIGNAL.warning.dark,

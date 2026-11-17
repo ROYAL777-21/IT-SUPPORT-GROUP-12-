@@ -82,7 +82,7 @@ export default function SignUpScreen() {
             autoComplete="email"
             keyboardType="email-address"
             textContentType="emailAddress"
-            placeholder="you@eduvos.ac.za"
+            placeholder="you@eduvos.com"
             error={submitted ? emailError : null}
             editable={!busy}
           />

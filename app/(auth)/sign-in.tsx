@@ -63,7 +63,7 @@ export default function SignInScreen() {
             autoComplete="email"
             keyboardType="email-address"
             textContentType="emailAddress"
-            placeholder="you@eduvos.ac.za"
+            placeholder="you@eduvos.com"
             editable={!busy}
           />
 
